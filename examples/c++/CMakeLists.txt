@@ -27,5 +27,6 @@ add_example( Gpufit Tofts_Fitting )
 add_example( Gpufit Tofts_Extended_Fitting )
 add_example( Gpufit Tissue_Uptake_Fitting )
 add_example( Gpufit 2CXM_Fitting )
+add_example( Gpufit T1_FA_Exponential_Fitting )
 
 add_cuda_example( Gpufit CUDA_Interface_Example )

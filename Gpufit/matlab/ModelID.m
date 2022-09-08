@@ -22,6 +22,7 @@ classdef ModelID
 	TOFTS_EXTENDED = 19
 	TISSUE_UPTAKE = 20
 	TWO_COMPARTMENT_EXCHANGE = 21
+	T1_FA_EXPONENTIAL = 22
     end
     methods (Static)
         function v = validID(id)

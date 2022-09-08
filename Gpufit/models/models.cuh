@@ -25,6 +25,7 @@
 #include "tofts_extended.cuh"
 #include "tissue_uptake.cuh"
 #include "two-compartment_exchange.cuh"
+#include "T1_fa_fit.cuh"
 
 __device__ void calculate_model(
     ModelID const model_id,
@@ -127,6 +128,11 @@ __device__ void calculate_model(
 		calculate_two_compartment_exchange(parameters, n_fits, n_points, value, derivative, point_index, fit_index, chunk_index, user_info, user_info_size);
 		break;
 #endif
+#ifdef GPUFIT_T1_FA_EXPONENTIAL_CUH_INCLUDED
+	case T1_FA_EXPONENTIAL:
+		calculate_t1_fa_exponential(parameters, n_fits, n_points, value, derivative, point_index, fit_index, chunk_index, user_info, user_info_size);
+		break;
+#endif
     case SPLINE_1D:
         calculate_spline1d(parameters, n_fits, n_points, value, derivative, point_index, fit_index, chunk_index, user_info, user_info_size);
         break;
@@ -173,6 +179,7 @@ void configure_model(ModelID const model_id, int & n_parameters, int & n_dimensi
     case TOFTS_EXTENDED:			n_parameters = 3; n_dimensions = 1; break;
     case TISSUE_UPTAKE:				n_parameters = 3; n_dimensions = 1; break;
     case TWO_COMPARTMENT_EXCHANGE:	n_parameters = 4; n_dimensions = 1; break;
+    case T1_FA_EXPONENTIAL:			n_parameters = 2; n_dimensions = 1; break;
     default: throw std::runtime_error("unknown model ID");
     }
 }
