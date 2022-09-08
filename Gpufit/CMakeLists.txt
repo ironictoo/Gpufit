@@ -257,6 +257,7 @@ option( GPUFIT_USE_TOFTS "Use the Tofts model to fit." )
 option( GPUFIT_USE_TOFTS_EXTENDED "Use the extended Tofts model to fit." )
 option( GPUFIT_USE_TISSUE_UPTAKE "Use the tissue uptake model to fit." )
 option( GPUFIT_USE_2CXM "Use the two-compartment exchange model to fit." )
+option( GPUFIT_USE_T1_FA_EXPONENTIAL "Enable GPU accelerated T1 exponential mapping." )
 
 if( GPUFIT_USE_DIXON_2 )
 	add_definitions( -DUSE_DIXON_2 )
@@ -288,6 +289,10 @@ endif()
 
 if ( GPUFIT_USE_2CXM )
 	add_definitions( -DUSE_2CXM )
+endif()
+
+if ( GPUFIT_USE_T1_FA_EXPONENTIAL )
+	add_definitions( -DUSE_T1_FA_EXPONENTIAL )
 endif()
 
 #install( TARGETS Gpufit RUNTIME DESTINATION bin )
