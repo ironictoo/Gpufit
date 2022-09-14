@@ -87,7 +87,7 @@ void patlak_two()
 		// random offset
 		initial_parameters[i * n_model_parameters + 0] = true_parameters[0] * (0.1f + 1.8f * uniform_dist(rng));
 		// random slope
-		initial_parameters[i * n_model_parameters + 1] = true_parameters[0] * (0.1f + 1.8f * uniform_dist(rng));
+		initial_parameters[i * n_model_parameters + 1] = true_parameters[1] * (0.1f + 1.8f * uniform_dist(rng));
 	}
 
 	// generate data

@@ -40,7 +40,7 @@ void t1_fa_exponential_two()
 
 	// custom x positions for the data points of every fit, stored in user info
 	// variable flip angle, given in degrees
-	REAL theta[] = { 2, 5, 10, 12, 15 };
+	REAL theta[] = { 2*M_PI/180, 5*M_PI/180, 10*M_PI/180, 12*M_PI/180, 15*M_PI/180 };
 
 	// Time resolution (constant)
 	REAL tr[] =   {	21.572f, 21.572f, 21.572f, 21.572f, 21.572f };
@@ -58,7 +58,7 @@ void t1_fa_exponential_two()
 	}
 
 	// size of user info in bytes
-	size_t const user_info_size = 2 * n_points_per_fit * sizeof(REAL);
+	size_t const user_info_size = n_model_parameters * n_points_per_fit * sizeof(REAL);
 
 	// initialize random number generator
 	std::mt19937 rng;
@@ -73,10 +73,10 @@ void t1_fa_exponential_two()
 	std::vector< REAL > initial_parameters(n_fits * n_model_parameters);
 	for (size_t i = 0; i != n_fits; i++)
 	{
-		// random offset
-		initial_parameters[i * n_model_parameters + 0] = true_parameters[0] * (0.1f + 1.8f * uniform_dist(rng));
-		// random slope
-		initial_parameters[i * n_model_parameters + 1] = true_parameters[0] * (0.1f + 1.8f * uniform_dist(rng));
+		// random a
+		initial_parameters[i * n_model_parameters + 0] = true_parameters[0]; //* (0.1f + 1.8f * uniform_dist(rng));
+		// random t1
+		initial_parameters[i * n_model_parameters + 1] = true_parameters[1]; //* (0.1f + 1.8f * uniform_dist(rng));
 	}
 
 	// generate data
@@ -93,24 +93,22 @@ void t1_fa_exponential_two()
 //			x += (tr[n - 1] + tr[n]) / 2 * spacing;
 //		}
 //		REAL y = true_parameters[0] * x + true_parameters[1] * tr[k];
-		REAL y = true_parameters[0] * ( (1 - exp(-tr[k]/true_parameters[1])) * sin(theta[k])) / (1 - exp(-tr[k]/true_parameters[1]) * cos(theta[k]) );
+		REAL y = true_parameters[0] * ( (1 - exp(-tr[k]/true_parameters[1])) * sin(theta[k]*M_PIf/180)) / (1 - exp(-tr[k]/true_parameters[1]) * cos(theta[k]*M_PIf/180) );
 		//data[i] = y + normal_dist(rng);
 		//data[i] = y * (0.2f + 1.6f * uniform_dist(rng));
 		data[i] = y;
 		mean_y += y;
-		//std::cout << data[i] << std::endl;
+		std::cout << data[i] << std::endl;
 	}
 	mean_y = mean_y / data.size();
 	std::normal_distribution<REAL> norm_snr(0,mean_y/snr);
 	for (size_t i = 0; i != data.size(); i++)
 	{
-		data[i] = data[i] + norm_snr(rng);
+		data[i] = data[i];// + norm_snr(rng);
 	}
 
-
-
 	// tolerance
-	REAL const tolerance = 10e-8f;
+	REAL const tolerance = 10e-3f;
 
 	// maximum number of iterations
 	int const max_number_iterations = 200;
