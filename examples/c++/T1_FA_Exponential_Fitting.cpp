@@ -13,7 +13,7 @@ void t1_fa_exponential_two()
 	This example generates test data in form of 10000 one dimensional linear
 	curves with the size of 20 data points per curve. It is noised by normal
 	distributed noise. The initial guesses were randomized, within a specified
-	range of the true value. The LINEAR_1D model is fitted to the test data sets
+	range of the true value. The T1_FA_EXPONENTIAL model is fitted to the test data sets
 	using the LSE estimator. The optional parameter user_info is used to pass
 	custom x positions of the data sets. The same x position values are used for
 	every fit.
@@ -31,12 +31,11 @@ void t1_fa_exponential_two()
 	clock_t time_start, time_end;
 	time_start = clock();
 
-
 	// number of fits, fit points and parameters
 	size_t const n_fits = 10000;
 	size_t const n_points_per_fit = 5;
 	size_t const n_model_parameters = 2;
-	REAL snr = 0.8;
+	REAL snr = 10;
 
 	// custom x positions for the data points of every fit, stored in user info
 	// variable flip angle, given in degrees
@@ -74,9 +73,9 @@ void t1_fa_exponential_two()
 	for (size_t i = 0; i != n_fits; i++)
 	{
 		// random a
-		initial_parameters[i * n_model_parameters + 0] = true_parameters[0]; //* (0.1f + 1.8f * uniform_dist(rng));
+		initial_parameters[i * n_model_parameters + 0] = true_parameters[0] * (0.1f + 1.8f * uniform_dist(rng));
 		// random t1
-		initial_parameters[i * n_model_parameters + 1] = true_parameters[1]; //* (0.1f + 1.8f * uniform_dist(rng));
+		initial_parameters[i * n_model_parameters + 1] = true_parameters[1] * (0.1f + 1.8f * uniform_dist(rng));
 	}
 
 	// generate data
@@ -93,22 +92,21 @@ void t1_fa_exponential_two()
 //			x += (tr[n - 1] + tr[n]) / 2 * spacing;
 //		}
 //		REAL y = true_parameters[0] * x + true_parameters[1] * tr[k];
-		REAL y = true_parameters[0] * ( (1 - exp(-tr[k]/true_parameters[1])) * sin(theta[k]*M_PIf/180)) / (1 - exp(-tr[k]/true_parameters[1]) * cos(theta[k]*M_PIf/180) );
+		REAL y = true_parameters[0] * ( (1 - exp(-tr[k]/true_parameters[1])) * sin(theta[k])) / (1 - exp(-tr[k]/true_parameters[1]) * cos(theta[k]) );
 		//data[i] = y + normal_dist(rng);
 		//data[i] = y * (0.2f + 1.6f * uniform_dist(rng));
 		data[i] = y;
 		mean_y += y;
-		std::cout << data[i] << std::endl;
 	}
 	mean_y = mean_y / data.size();
 	std::normal_distribution<REAL> norm_snr(0,mean_y/snr);
 	for (size_t i = 0; i != data.size(); i++)
 	{
-		data[i] = data[i];// + norm_snr(rng);
+		data[i] = data[i] + norm_snr(rng);
 	}
 
 	// tolerance
-	REAL const tolerance = 10e-3f;
+	REAL const tolerance = 10e-12f;
 
 	// maximum number of iterations
 	int const max_number_iterations = 200;
