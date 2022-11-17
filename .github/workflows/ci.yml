@@ -111,6 +111,10 @@ jobs:
         if: runner.os == 'Linux'
         working-directory: ${{ env.build_dir }}
         run: make
+      
+      - name: Create Package (Linux)
+        if: runner.os == 'Linux'
+        run: ./package/create_package.sh ${{ env.build_dir }} 1.2.0 $(pwd)
 
       - name: Upload Artifacts (Windows)
         uses: actions/upload-artifact@v3
@@ -124,4 +128,4 @@ jobs:
         if: runner.os == 'Linux'
         with:
           name: ${{ matrix.os }}-x64-cuda-${{ matrix.cuda }}
-          path: build/**/*
+          path: ${{ env.build_dir }}/install/Gpufit_1.2.0_linux.zip
