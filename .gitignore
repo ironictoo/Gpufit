@@ -1,6 +1,9 @@
 # IntelliJ
 **/.idea
 
+# Eclipse
+.project
+
 # Python
 __pycache__
 
