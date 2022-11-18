@@ -115,6 +115,10 @@ jobs:
         working-directory: ${{ env.build_dir }}
         run: make
         
+      - name: Create Package (Windows)
+        if: runner.os == 'Windows'
+        run: ./package/create_package.bat ${{ env.build_dir }} 1.2.0 $(pwd)
+        
       - name: Create Package (Linux)
         if: runner.os == 'Linux'
         run: ./package/create_package.sh ${{ env.build_dir }} 1.2.0 $(pwd)
