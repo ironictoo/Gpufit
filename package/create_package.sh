@@ -146,14 +146,12 @@ cp "$x64_PYTHON_BUILD/pyGpufit-$VERSION-py2.py3-none-any.whl" "$PYTHON_INSTALL/p
 cp "$PYTHON_SOURCE/README.txt" "$PYTHON_INSTALL"
 cp "$EXAMPLES_SOURCE/python" "$PYTHON_INSTALL/examples" -n -r
 
-
 # copy Matlab 64 bit
 
 echo collect matlab64
 mkdir $x64_MATLAB_INSTALL
 cp "$x64_MATLAB_BUILD" "$x64_MATLAB_INSTALL" -r
 cp "$EXAMPLES_SOURCE/matlab" "$x64_MATLAB_INSTALL/examples" -n -r
-
 
 # copy Java 64 bit
 

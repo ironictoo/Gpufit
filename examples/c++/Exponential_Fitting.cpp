@@ -4,15 +4,27 @@
 #include <random>
 #include <iostream>
 #include <math.h>
+#include <complex>
+using namespace std;
 
-void linear_regression_example()
+void exponential()
 {
+	// variables
+	float const exp = 2.71828;
+	float const pi =  3.14159;
+
+	// estimator ID
+	int const estimator_id = LSE;
+
+	// model ID
+	int const model_id = EXPONENTIAL;
+
     /*
     This example generates test data in form of 10000 one dimensional linear
     curves with the size of 20 data points per curve. It is noised by normal
     distributed noise. The initial guesses were randomized, within a specified
     range of the true value. The LINEAR_1D model is fitted to the test data sets
-    using the LSE estimator. The optional parameter user_info is used to pass 
+    using the LSE estimator. The optional parameter user_info is used to pass
     custom x positions of the data sets. The same x position values are used for
     every fit.
 
@@ -25,38 +37,42 @@ void linear_regression_example()
     - and the mean number of iterations needed.
     */
 
+	// Signal to Noise Ratio
+	float snr = 50;
 	// number of fits, fit points and parameters
-	std::size_t const n_fits = 10000;
-	std::size_t const n_points_per_fit = 20;
-	std::size_t const n_model_parameters = 2;
+	size_t const n_fits = 100; //10000
+	size_t const n_points_per_fit = 6;
 
-	// custom x positions for the data points of every fit, stored in user info
+	size_t const n_model_parameters = 2;
+
 	std::vector< REAL > user_info(n_points_per_fit);
-	for (size_t i = 0; i < n_points_per_fit; i++)
-	{
-		user_info[i] = static_cast<REAL>(pow(2, i));
-	}
 
 	// size of user info in bytes
-	std::size_t const user_info_size = n_points_per_fit * sizeof(REAL); 
+	size_t const user_info_size = n_points_per_fit * sizeof(REAL);
+
+	// true parameters
+	std::vector< REAL > true_parameters { 20, 175};
+
+	//possible place for error
+	float sigma =  (true_parameters[1]) / snr;
 
 	// initialize random number generator
 	std::mt19937 rng;
 	rng.seed(0);
-	std::uniform_real_distribution< REAL > uniform_dist(0, 1);
-	std::normal_distribution< REAL > normal_dist(0, 1);
-
-	// true parameters
-	std::vector< REAL > true_parameters { 5, 2 }; // offset, slope
+	std::uniform_real_distribution< REAL > uniform_dist(0.0f, 1.0f);
+	std::normal_distribution< REAL > normal_dist(0.0f, sigma);
 
 	// initial parameters (randomized)
 	std::vector< REAL > initial_parameters(n_fits * n_model_parameters);
 	for (size_t i = 0; i != n_fits; i++)
 	{
-		// random offset
+		// random 1st parameter
 		initial_parameters[i * n_model_parameters + 0] = true_parameters[0] * (0.8f + 0.4f * uniform_dist(rng));
-		// random slope
-		initial_parameters[i * n_model_parameters + 1] = true_parameters[0] * (0.8f + 0.4f * uniform_dist(rng));
+		// random 2nd parameter
+		initial_parameters[i * n_model_parameters + 1] = true_parameters[1] * (0.8f + 0.4f * uniform_dist(rng));
+
+		std::cout << "parameter 0 + noise            " << (REAL) initial_parameters[i * n_model_parameters + 0] << "\n";
+		std::cout << "parameter 1 + noise            " << (REAL) initial_parameters[i * n_model_parameters + 1] << "\n";
 	}
 
 	// generate data
@@ -67,21 +83,19 @@ void linear_regression_example()
 		size_t k = i % n_points_per_fit; // the position within a fit
 
 		REAL x = user_info[k];
-		REAL y = true_parameters[0] + x * true_parameters[1];
-		data[i] = y + normal_dist(rng);
+	    REAL y = true_parameters[1] * pow(exp,(-1 * true_parameters[0] * x));
+		float rician_noise = sqrt(pow(normal_dist(rng),2) + pow(normal_dist(rng),2));
+		data[i] = y + rician_noise;
+		std::cout << "y             " << (REAL) y << "\n";
+		std::cout << "rician noise  " << (REAL) rician_noise << "\n";
+		std::cout << "y with noise  " << (REAL) data[i] << "\n";
 	}
 
 	// tolerance
-	REAL const tolerance = 0.001f;
+	REAL const tolerance = 10e-15f;
 
 	// maximum number of iterations
-	int const max_number_iterations = 20;
-
-	// estimator ID
-	int const estimator_id = LSE;
-
-	// model ID
-	int const model_id = LINEAR_1D;
+	int const max_number_iterations = 200;
 
 	// parameters to fit (all of them)
 	std::vector< int > parameters_to_fit(n_model_parameters, 1);
@@ -138,9 +152,9 @@ void linear_regression_example()
 	{
 		if (output_states[i] == FitState::CONVERGED)
 		{
-			// add offset
+			// add 1st parameter
 			output_parameters_mean[0] += output_parameters[i * n_model_parameters + 0];
-			// add slope
+			// add 2nd parameter
 			output_parameters_mean[1] += output_parameters[i * n_model_parameters + 1];
 		}
 	}
@@ -153,9 +167,9 @@ void linear_regression_example()
 	{
 		if (output_states[i] == FitState::CONVERGED)
 		{
-			// add squared deviation for offset
+			// add squared deviation for 1st parameter
 			output_parameters_std[0] += (output_parameters[i * n_model_parameters + 0] - output_parameters_mean[0]) * (output_parameters[i * n_model_parameters + 0] - output_parameters_mean[0]);
-			// add squared deviation for slope
+			// add squared deviation for 2nd parameter
 			output_parameters_std[1] += (output_parameters[i * n_model_parameters + 1] - output_parameters_mean[1]) * (output_parameters[i * n_model_parameters + 1] - output_parameters_mean[1]);
 		}
 	}
@@ -164,8 +178,8 @@ void linear_regression_example()
 	output_parameters_std[1] = sqrt(output_parameters_std[1] / output_states_histogram[0]);
 
 	// print mean and std
-	std::cout << "offset  true " << true_parameters[0] << " mean " << output_parameters_mean[0] << " std " << output_parameters_std[0] << "\n";
-	std::cout << "slope   true " << true_parameters[1] << " mean " << output_parameters_mean[1] << " std " << output_parameters_std[1] << "\n";
+	std::cout << "parameter 0   true " << true_parameters[0] << " mean " << output_parameters_mean[0] << " std " << output_parameters_std[0] << "\n";
+	std::cout << "parameter 1   true " << true_parameters[1] << " mean " << output_parameters_mean[1] << " std " << output_parameters_std[1] << "\n";
 
 	// compute mean chi-square for those converged
 	REAL  output_chi_square_mean = 0;
@@ -194,14 +208,13 @@ void linear_regression_example()
 	std::cout << "mean number of iterations " << output_number_iterations_mean << "\n";
 }
 
-
 int main(int argc, char *argv[])
 {
-	linear_regression_example();
+	exponential();
 
     std::cout << std::endl << "Example completed!" << std::endl;
     std::cout << "Press ENTER to exit" << std::endl;
     std::getchar();
-	
+
 	return 0;
 }

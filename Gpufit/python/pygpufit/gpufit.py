@@ -60,9 +60,13 @@ class ModelID:
     SPLINE_3D = 10
     SPLINE_3D_MULTICHANNEL = 11
     SPLINE_3D_PHASE_MULTICHANNEL = 12
+    LIVER_FAT_TWO = 13
+    LIVER_FAT_THREE = 14
+    LIVER_FAT_FOUR = 15
+    EXPONENTIAL = 16
 
+class EstimatorID():
 
-class EstimatorID:
     LSE = 0
     MLE = 1
 

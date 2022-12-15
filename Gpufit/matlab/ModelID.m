@@ -13,6 +13,15 @@ classdef ModelID
         SPLINE_3D = 10
         SPLINE_3D_MULTICHANNEL = 11
         SPLINE_3D_PHASE_MULTICHANNEL = 12
+        LIVER_FAT_TWO = 13
+        LIVER_FAT_THREE = 14
+        LIVER_FAT_FOUR = 15
+        EXPONENTIAL = 16        
+        PATLAK = 17
+	TOFTS = 18
+	TOFTS_EXTENDED = 19
+	TISSUE_UPTAKE = 20
+	TWO_COMPARTMENT_EXCHANGE = 21
     end
     methods (Static)
         function v = validID(id)

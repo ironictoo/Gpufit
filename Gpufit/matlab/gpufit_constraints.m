@@ -1,6 +1,6 @@
 function [parameters, states, chi_squares, n_iterations, time]...
-    = gpufit_constrained(data, weights, model_id, initial_parameters, constraints, constraint_types, tolerance, max_n_iterations, parameters_to_fit, estimator_id, user_info)
-% Wrapper around the GpufitConstrainedMex file.
+    = gpufit_constraints(data, constraints, weights, model_id, initial_parameters, tolerance, max_n_iterations, parameters_to_fit, estimator_id, user_info)
+% Wrapper around the Gpufit mex file.
 %
 % Optional arguments can be given as empty matrix [].
 %
@@ -9,25 +9,17 @@ function [parameters, states, chi_squares, n_iterations, time]...
 %% size checks
 
 % number of input parameter (variable)
-if nargin < 11
+if nargin < 9
     user_info = [];
-    if nargin < 10
+    if nargin < 8
         estimator_id = [];
-        if nargin < 9
+        if nargin < 7
             parameters_to_fit = [];
-            if nargin < 8
+            if nargin < 6
                 max_n_iterations = [];
-                if nargin < 7
+                if nargin < 5
                     tolerance = [];
-                    if nargin < 6
-                        constraint_types = [];
-                        if nargin < 5
-                            constraints = [];
-                            if nargin < 4
-                                assert('Not enough parameters');
-                            end
-                        end
-                    end
+					assert(nargin == 4, 'Not enough parameters');
                 end
             end
         end
@@ -39,6 +31,11 @@ data_size = size(data);
 assert(length(data_size) == 2, 'data is not two-dimensional');
 n_points = data_size(1);
 n_fits = data_size(2);
+
+% consistency with constraints
+% first dimension has to be 2*n_parameters
+% second dimension has to be the number of fist
+assert(n_fits == size(constraints,2), 'Dimension mismatch between data and constraints')
 
 % consistency with weights (if given)
 if ~isempty(weights)
@@ -56,21 +53,7 @@ if ~isempty(parameters_to_fit)
     assert(size(parameters_to_fit, 1) == n_parameters, 'Dimension mismatch in number of parameters between initial_parameters and parameters_to_fit');
 end
 
-% consistency with constraints (if given)
-% first dimension has to be 2*n_parameters
-% second dimension has to be the number of fist
-if ~isempty(constraints)
-	assert(n_fits == size(constraints,2), 'Dimension mismatch between data and constraints')
-end
-
 %% default values
-if isempty(constraints)
-    constraints = [];
-end
-
-if isempty(constraint_types)
-    constraint_types = zeros(n_parameters,'int32');
-end
 
 % tolerance
 if isempty(tolerance)
@@ -96,20 +79,13 @@ end
 
 %% type checks
 
-% data, weights (if given), initial_parameters are all single
+% data, constraints, weights (if given), initial_parameters are all single
 assert(isa(data, 'single'), 'Type of data is not single');
 if ~isempty(weights)
     assert(isa(weights, 'single'), 'Type of weights is not single');
 end
 assert(isa(initial_parameters, 'single'), 'Type of initial_parameters is not single');
-
-% constraints are either empty or single
-if ~isempty(constraints)
-    assert(isa(constraints, 'single'), 'Type of constraints is not single');
-end
-
-% constraint types are int32
-assert(isa(constraint_types,'int32'), 'Type of constraint_types is not int32');
+assert(isa(constraints, 'single'), 'Type of constraints is not single');
 
 % parameters_to_fit is int32 (cast to int32 if incorrect type)
 if ~isa(parameters_to_fit, 'int32')
@@ -135,25 +111,10 @@ else
 end
 
 
-%% run constrained Gpufit taking the time
+%% run Gpufit taking the time
 tic;
 [parameters, states, chi_squares, n_iterations] ...
-    = GpufitConstrainedMex(...
-        data,...
-        weights,...
-        n_fits,...
-        n_points,...
-        tolerance,...
-        max_n_iterations,...
-        estimator_id,...
-        initial_parameters,...
-        constraints,...
-        constraint_types,...
-        parameters_to_fit,...
-        model_id,...
-        n_parameters,...
-        user_info,...
-        user_info_size);
+    = GpufitConstraintsMex(data, constraints, weights, n_fits, n_points, tolerance, max_n_iterations, estimator_id, initial_parameters, parameters_to_fit, model_id, n_parameters, user_info, user_info_size);
 
 time = toc;
 
