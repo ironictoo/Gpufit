@@ -4,6 +4,8 @@
 #include <vector>
 #include <random>
 #include <iostream>
+
+#define _USE_MATH_DEFINES
 #include <math.h>
 
 void t1_fa_exponential_two()
