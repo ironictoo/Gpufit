@@ -108,9 +108,12 @@ jobs:
         id: configure
         shell: bash
         run: |
+          cat ${{ env.build_dir }}/CMakeCache.txt
+          rm ${{ env.build_dir }}/CMakeCache.txt
           if [ "${{ runner.os }}" -eq "Windows" ]
           then
-            cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET=cuda=${{steps.cuda-toolkit-w.outputs.CUDA_PATH}}
+            cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET="cuda=${{steps.cuda-toolkit-w.outputs.CUDA_PATH}}"
+            CMakeCache.txt
           else
             cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE
           fi
