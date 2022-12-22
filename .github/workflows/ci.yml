@@ -81,8 +81,6 @@ jobs:
           cuda: ${{ matrix.cuda }}
           method: network
           use-github-cache: false
-        run: echo "Cuda install location: ${{steps.cuda-toolkit-w.outputs.CUDA_PATH}}"
-        run: echo "Installed cuda version is: ${{steps.cuda-toolkit-w.outputs.cuda}}"
 
       - name: Install CUDA (Linux)
         uses: Jimver/cuda-toolkit@v0.2.8
@@ -93,8 +91,6 @@ jobs:
           cuda: ${{ matrix.cuda }}
           method: network
           use-github-cache: false
-        run: echo "Cuda install location: ${{steps.cuda-toolkit-l.outputs.CUDA_PATH}}"
-        run: echo "Installed cuda version is: ${{steps.cuda-toolkit-l.outputs.cuda}}"
 
       - name: nvcc check
         shell: bash
