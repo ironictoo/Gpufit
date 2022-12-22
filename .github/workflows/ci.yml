@@ -74,21 +74,27 @@ jobs:
 
       - name: Install CUDA (Windows)
         uses: Jimver/cuda-toolkit@v0.2.8
+        id: cuda-toolkit-w
         if: runner.os == 'Windows'
         with:
           sub-packages: '["nvcc", "visual_studio_integration", "cublas", "curand", "nvrtc", "cudart"]'
           cuda: ${{ matrix.cuda }}
           method: network
           use-github-cache: false
+        run: echo "Cuda install location: ${{steps.cuda-toolkit-w.outputs.CUDA_PATH}}"
+        run: echo "Installed cuda version is: ${{steps.cuda-toolkit-w.outputs.cuda}}"
 
       - name: Install CUDA (Linux)
         uses: Jimver/cuda-toolkit@v0.2.8
+        id: cuda-toolkit-l
         if: runner.os == 'Linux'
         with:
           sub-packages: '["nvcc", "nvrtc", "cudart"]'
           cuda: ${{ matrix.cuda }}
           method: network
           use-github-cache: false
+        run: echo "Cuda install location: ${{steps.cuda-toolkit-l.outputs.CUDA_PATH}}"
+        run: echo "Installed cuda version is: ${{steps.cuda-toolkit-l.outputs.cuda}}"
 
       - name: nvcc check
         shell: bash
@@ -108,7 +114,7 @@ jobs:
         run: |
           if [ "${{ runner.os }}" -eq "Windows" ]
           then
-            cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64
+            cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_VS_PLATFORM_TOOLSET_CUDA=${{steps.cuda-toolkit-w.outputs.cuda}}
           else
             cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE
           fi
