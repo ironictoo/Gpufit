@@ -16,3 +16,4 @@ Gpufit/java/gpufit/out
 # VS Code
 .vscode
 .project
+*.code-workspace
