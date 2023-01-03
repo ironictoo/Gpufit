@@ -59,7 +59,9 @@ jobs:
         uses: actions/cache@v3
         id: cache-cuda
         with:
-          path: /usr/local/cuda*
+          path: |
+            /usr/local/cuda*
+            C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA*
           key: ${{ matrix.os }}-${{ matrix.cuda }}
           restore-keys: ${{ matrix.os }}-${{ matrix.cuda }}
 
