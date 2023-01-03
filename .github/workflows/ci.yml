@@ -57,8 +57,9 @@ jobs:
 
       - name: Cache build
         uses: actions/cache@v3
+        id: cache-cuda
         with:
-          path: ${{steps.cuda-toolkit.outputs.CUDA_PATH}}
+          path: ${{github.workspace}}/CUDA
           key: ${{ matrix.os }}-${{ matrix.cuda }}
           restore-keys: ${{ matrix.os }}-${{ matrix.cuda }}
 
