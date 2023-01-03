@@ -23,7 +23,7 @@ Push to Github afterwards (you can add a Git tag for the new version with git ta
 
 ## Convert Documentation from restructured text to html/latex
 
-Use documentation_create_latex.bat in this folder or do it manually using sphinx and docs/make.bat.
+Use documentation_create_latex.bat (documentation_create_latex.sh for linux) in this folder or do it manually using sphinx and docs/make.bat.
 
 ## Use CMAKE to generate the project
 
