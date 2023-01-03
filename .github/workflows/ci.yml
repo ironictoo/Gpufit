@@ -58,9 +58,9 @@ jobs:
       - name: Cache build
         uses: actions/cache@v3
         with:
-          path: ${{github.workspace}}/build
-          key: ${{ matrix.os }}-build
-          restore-keys: ${{ matrix.os }}-build
+          path: ${{steps.cuda-toolkit.outputs.CUDA_PATH}}
+          key: ${{ matrix.os }}-${{ matrix.cuda }}
+          restore-keys: ${{ matrix.os }}-${{ matrix.cuda }}
 
       - name: Setup Python ${{ matrix.python }}
         uses: actions/setup-python@v4
@@ -73,7 +73,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install wheel
 
-      - name: Install CUDA (Windows)
+      - if: ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
+        name: Install CUDA (Windows)
         uses: Jimver/cuda-toolkit@v0.2.8
         id: cuda-toolkit-w
         if: runner.os == 'Windows'
@@ -81,9 +82,9 @@ jobs:
           sub-packages: '["nvcc", "visual_studio_integration", "cublas", "curand", "nvrtc", "cudart"]'
           cuda: ${{ matrix.cuda }}
           method: network
-          use-github-cache: false
 
-      - name: Install CUDA (Linux)
+      - if: ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
+        name: Install CUDA (Linux)
         uses: Jimver/cuda-toolkit@v0.2.8
         id: cuda-toolkit-l
         if: runner.os == 'Linux'
@@ -91,7 +92,6 @@ jobs:
           sub-packages: '["nvcc", "nvrtc", "cudart"]'
           cuda: ${{ matrix.cuda }}
           method: network
-          use-github-cache: false
 
       - name: nvcc check
         shell: bash
