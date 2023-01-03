@@ -77,7 +77,7 @@ jobs:
       - name: Install CUDA (Windows)
         uses: Jimver/cuda-toolkit@v0.2.8
         id: cuda-toolkit-w
-        if: runner.os == 'Windows' && ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
+        if: runner.os == 'Windows'
         with:
           sub-packages: '["nvcc", "visual_studio_integration", "cublas", "curand", "nvrtc", "cudart"]'
           cuda: ${{ matrix.cuda }}
@@ -86,7 +86,7 @@ jobs:
       - name: Install CUDA (Linux)
         uses: Jimver/cuda-toolkit@v0.2.8
         id: cuda-toolkit-l
-        if: runner.os == 'Linux' && ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
+        if: runner.os == 'Linux'
         with:
           sub-packages: '["nvcc", "nvrtc", "cudart"]'
           cuda: ${{ matrix.cuda }}
