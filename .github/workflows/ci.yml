@@ -89,7 +89,7 @@ jobs:
           echo "CUDA_PATH_V${{ matrix.cuda-major }}_${{ matrix.cuda-minor }}=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}" >> $GITHUB_ENV
           echo "CUDA_PATH_VX_Y=CUDA_PATH_V${{ matrix.cuda-major }}_${{ matrix.cuda-minor }}" >> $GITHUB_ENV
           echo "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}\\bin" >> $GITHUB_PATH
-          cp "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}\\extras\\visual_studio_integration\\MSBuildExtensions" "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\BuildCustomizations"
+          cp "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}\\extras\\visual_studio_integration\\MSBuildExtensions*" "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\BuildCustomizations"
           
       - name: Add cache hit to PATH (Linux)
         if: runner.os == 'Linux' && steps.cache-cuda.outputs.cache-hit == 'true'
