@@ -44,23 +44,15 @@ jobs:
             python: "3.9"
           - os: ubuntu-20.04
             cuda: "11.3.1"
-            cuda-major: "11"
-            cuda-minor: "3"
             python: "3.8"
           - os: ubuntu-20.04
             cuda: "11.4.0"
-            cuda-major: "11"
-            cuda-minor: "4"
             python: "3.8"
           - os: ubuntu-20.04
             cuda: "11.7.0"
-            cuda-major: "11"
-            cuda-minor: "7"
             python: "3.8"
           - os: ubuntu-22.04
             cuda: "11.7.0"
-            cuda-major: "11"
-            cuda-minor: "7"
             python: "3.10"
 
     env:
@@ -76,7 +68,6 @@ jobs:
         id: cache-cuda
         with:
           path: |
-            /usr/local/cuda*
             C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA*
           key: ${{ matrix.os }}-${{ matrix.cuda }}
           restore-keys: ${{ matrix.os }}-${{ matrix.cuda }}
@@ -90,12 +81,6 @@ jobs:
           echo "CUDA_PATH_VX_Y=CUDA_PATH_V${{ matrix.cuda-major }}_${{ matrix.cuda-minor }}" >> $GITHUB_ENV
           echo "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}\\bin" >> $GITHUB_PATH
           cp -R "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}\\extras\\visual_studio_integration\\MSBuildExtensions\\." "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\MSBuild\Microsoft\VC\v160\BuildCustomizations"
-          
-      - name: Add cache hit to PATH (Linux)
-        if: runner.os == 'Linux' && steps.cache-cuda.outputs.cache-hit == 'true'
-        run: |
-          echo "CUDA_PATH=/usr/local/cuda-${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}" >> $GITHUB_ENV
-          echo "/usr/local/cuda-${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}/bin" >> $GITHUB_PATH
 
       - name: Setup Python ${{ matrix.python }}
         uses: actions/setup-python@v4
@@ -108,7 +93,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install wheel
 
-      - name: Install CUDA (Windows)
+      - name: Install CUDA if not cached (Windows)
         uses: Jimver/cuda-toolkit@v0.2.8
         id: cuda-toolkit-w
         if: runner.os == 'Windows' && steps.cache-cuda.outputs.cache-hit != 'true'
