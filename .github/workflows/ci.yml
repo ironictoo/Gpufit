@@ -86,8 +86,8 @@ jobs:
         shell: bash
         run: |
           echo "CUDA_PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}" >> $GITHUB_ENV
-          echo "CUDA_PATH_V${{ matrix_cuda-major }}_${{ matrix_cuda-minor }}=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}" >> $GITHUB_ENV
-          echo "CUDA_PATH_VX_Y=CUDA_PATH_V${{ matrix_cuda-major }}_${{ matrix_cuda-minor }}" >> $GITHUB_ENV
+          echo "CUDA_PATH_V${{ matrix.cuda-major }}_${{ matrix.cuda-minor }}=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}" >> $GITHUB_ENV
+          echo "CUDA_PATH_VX_Y=CUDA_PATH_V${{ matrix.cuda-major }}_${{ matrix.cuda-minor }}" >> $GITHUB_ENV
           echo "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}\\bin" >> $GITHUB_PATH
           
       - name: Add cache hit to PATH (Linux)
