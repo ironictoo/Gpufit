@@ -20,39 +20,47 @@ jobs:
           # Windows2019 & VS 2019 supports cuda 10.1+
           - os: windows-2019
             cuda: "10.1.243"
-            cuda-base: "10.1"
+            cuda-major: "10"
+            cuda-minor: "1"
             visual_studio: "Visual Studio 16 2019"
             python: "3.9"
           - os: windows-2019
             cuda: "11.3.1"
-            cuda-base: "11.3"
+            cuda-major: "11"
+            cuda-minor: "3"
             visual_studio: "Visual Studio 16 2019"
             python: "3.9"
           - os: windows-2019
             cuda: "11.4.0"
-            cuda-base: "11.4"
+            cuda-major: "11"
+            cuda-minor: "4"
             visual_studio: "Visual Studio 16 2019"
             python: "3.9"
           - os: windows-2019
             cuda: "11.7.0"
-            cuda-base: "11.7"
+            cuda-major: "11"
+            cuda-minor: "7"
             visual_studio: "Visual Studio 16 2019"
             python: "3.9"
           - os: ubuntu-20.04
             cuda: "11.3.1"
-            cuda-base: "11.3"
+            cuda-major: "11"
+            cuda-minor: "3"
             python: "3.8"
           - os: ubuntu-20.04
             cuda: "11.4.0"
-            cuda-base: "11.4"
+            cuda-major: "11"
+            cuda-minor: "4"
             python: "3.8"
           - os: ubuntu-20.04
             cuda: "11.7.0"
-            cuda-base: "11.7"
+            cuda-major: "11"
+            cuda-minor: "7"
             python: "3.8"
           - os: ubuntu-22.04
             cuda: "11.7.0"
-            cuda-base: "11.7"
+            cuda-major: "11"
+            cuda-minor: "7"
             python: "3.10"
 
     env:
@@ -77,14 +85,16 @@ jobs:
         if: runner.os == 'Windows' && steps.cache-cuda.outputs.cache-hit == 'true'
         shell: bash
         run: |
-          echo "CUDA_PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-base }}" >> $GITHUB_ENV
-          echo "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-base }}\\bin" >> $GITHUB_PATH
+          echo "CUDA_PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}" >> $GITHUB_ENV
+          echo "CUDA_PATH_V${{ matrix_cuda-major }}_${{ matrix_cuda-minor }}=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}" >> $GITHUB_ENV
+          echo "CUDA_PATH_VX_Y=CUDA_PATH_V${{ matrix_cuda-major }}_${{ matrix_cuda-minor }}" >> $GITHUB_ENV
+          echo "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}\\bin" >> $GITHUB_PATH
           
       - name: Add cache hit to PATH (Linux)
         if: runner.os == 'Linux' && steps.cache-cuda.outputs.cache-hit == 'true'
         run: |
-          echo "CUDA_PATH=/usr/local/cuda-${{ matrix.cuda-base }}" >> $GITHUB_ENV
-          echo "/usr/local/cuda-${{ matrix.cuda-base }}/bin" >> $GITHUB_PATH
+          echo "CUDA_PATH=/usr/local/cuda-${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}" >> $GITHUB_ENV
+          echo "/usr/local/cuda-${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}/bin" >> $GITHUB_PATH
 
       - name: Setup Python ${{ matrix.python }}
         uses: actions/setup-python@v4
