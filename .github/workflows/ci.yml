@@ -76,8 +76,8 @@ jobs:
       - name: Add cache hit to PATH (Windows)
         if: runner.os == 'Windows' && steps.cache-cuda.outputs.cache-hit == 'true'
         run: |
-          echo "CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${{ matrix.cuda-base }}" >> $GITHUB_ENV
-          echo "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${{ matrix.cuda-base }}\bin" >> $GITHUB_PATH
+          echo "CUDA_PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-base }}" >> $GITHUB_ENV
+          echo "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-base }}\\bin" >> $GITHUB_PATH
           
       - name: Add cache hit to PATH (Linux)
         if: runner.os == 'Linux' && steps.cache-cuda.outputs.cache-hit == 'true'
