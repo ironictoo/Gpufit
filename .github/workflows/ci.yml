@@ -96,14 +96,25 @@ jobs:
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v1.2.3
         
-      - name: Download and install Boost
+      - name: Download and install Boost (Windows)
         uses: MarkusJx/install-boost@v2.4.3
-        id: install-boost
+        id: install-boost-w
         with:
             # REQUIRED: Specify the required boost version
             # A list of supported versions can be found here:
             # https://github.com/MarkusJx/prebuilt-boost/blob/main/versions-manifest.json
             boost_version: 1.81.0
+            platform_version: 2019
+
+      - name: Download and install Boost (Linux)
+        uses: MarkusJx/install-boost@v2.4.3
+        id: install-boost-l
+        with:
+            # REQUIRED: Specify the required boost version
+            # A list of supported versions can be found here:
+            # https://github.com/MarkusJx/prebuilt-boost/blob/main/versions-manifest.json
+            boost_version: 1.81.0
+            platform_version: 20.04
         
       - name: Install CUDA if not cached (Windows)
         uses: Jimver/cuda-toolkit@v0.2.8
@@ -168,14 +179,14 @@ jobs:
         working-directory: ${{ env.build_dir }}
         run: cmake --build . --config ${{ env.config }} --target ALL_BUILD --verbose
         env:
-          BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
+          BOOST_ROOT: ${{ steps.install-boost-w.outputs.BOOST_ROOT }}
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
         working-directory: ${{ env.build_dir }}
         run: make
         env:
-          BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
+          BOOST_ROOT: ${{ steps.install-boost-l.outputs.BOOST_ROOT }}
 
       - name: Create Package (Windows)
         if: runner.os == 'Windows'
