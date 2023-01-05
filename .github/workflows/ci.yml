@@ -148,9 +148,10 @@ jobs:
         shell: bash
         run: cmake --version
 
-      - name: Configure CMake
-        id: configure
+      - name: Configure CMake (Windows)
+        id: configure-w
         shell: bash
+        if: runner.os == 'Windows'
         run: |
           rm -f ${{ env.build_dir }}/CMakeCache.txt
           if [ "${{ runner.os }}" = "Windows" ]
@@ -159,6 +160,18 @@ jobs:
           else
             cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE
           fi
+        env:
+          BOOST_ROOT: ${{ steps.install-boost-w.outputs.BOOST_ROOT }}
+
+      - name: Configure CMake (Linux)
+        id: configure-l
+        shell: bash
+        if: runner.os == 'Linux'
+        run: |
+          rm -f ${{ env.build_dir }}/CMakeCache.txt
+          cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE
+        env:
+          BOOST_ROOT: ${{ steps.install-boost-l.outputs.BOOST_ROOT }}
 
       - name: Configure Error Processing
         if: ${{ (failure() && steps.configure.outcome == 'failure') || success() }}
@@ -189,6 +202,13 @@ jobs:
         run: make
         env:
           BOOST_ROOT: ${{ steps.install-boost-l.outputs.BOOST_ROOT }}
+          
+      - name: Performance tests
+        working-directory: ${{ env.build_dir }}
+        run:  |
+            ./Gpufit_Cpufit_Performance_Comparison
+            ./Gpufit_Cpufit_Patlak
+            ./Patlak_Fitting_Comparison
 
       - name: Create Package (Windows)
         if: runner.os == 'Windows'
