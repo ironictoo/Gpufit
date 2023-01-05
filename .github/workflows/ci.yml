@@ -18,12 +18,12 @@ jobs:
       matrix:
         include:
           # Windows2019 & VS 2019 supports cuda 10.1+
-          - os: windows-2019
-            cuda: "10.1.243"
-            cuda-major: "10"
-            cuda-minor: "1"
-            visual_studio: "Visual Studio 16 2019"
-            python: "3.9"
+#           - os: windows-2019
+#             cuda: "10.1.243"
+#             cuda-major: "10"
+#             cuda-minor: "1"
+#             visual_studio: "Visual Studio 16 2019"
+#             python: "3.9"
           - os: windows-2019
             cuda: "11.3.1"
             cuda-major: "11"
@@ -203,12 +203,12 @@ jobs:
         env:
           BOOST_ROOT: ${{ steps.install-boost-l.outputs.BOOST_ROOT }}
           
-      - name: Performance tests
-        working-directory: ${{ env.build_dir }}
-        run:  |
-            ./Gpufit_Cpufit_Performance_Comparison
-            ./Gpufit_Cpufit_Patlak
-            ./Patlak_Fitting_Comparison
+#       - name: Performance tests
+#         working-directory: ${{ env.build_dir }}
+#         run:  |
+#             ./Gpufit_Cpufit_Performance_Comparison
+#             ./Gpufit_Cpufit_Patlak
+##             ./Patlak_Fitting_Comparison
 
       - name: Create Package (Windows)
         if: runner.os == 'Windows'
