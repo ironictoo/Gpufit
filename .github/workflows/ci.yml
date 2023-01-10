@@ -6,6 +6,7 @@ on:
       branches:
         - master
         - dev
+
   workflow_dispatch:
 
 jobs:
@@ -55,6 +56,7 @@ jobs:
             cuda: "11.7.0"
             python: "3.10"
 
+
     env:
       build_dir: "build"
       config: "Release"
@@ -81,6 +83,7 @@ jobs:
           echo "CUDA_PATH_VX_Y=CUDA_PATH_V${{ matrix.cuda-major }}_${{ matrix.cuda-minor }}" >> $GITHUB_ENV
           echo "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}\\bin" >> $GITHUB_PATH
           cp -R "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${{ matrix.cuda-major }}.${{ matrix.cuda-minor }}\\extras\\visual_studio_integration\\MSBuildExtensions\\." "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\MSBuild\Microsoft\VC\v160\BuildCustomizations"
+
 
       - name: Setup Python ${{ matrix.python }}
         uses: actions/setup-python@v4
@@ -122,6 +125,7 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.8
         id: cuda-toolkit-w
         if: runner.os == 'Windows' && steps.cache-cuda.outputs.cache-hit != 'true'
+
         with:
           sub-packages: '["nvcc", "visual_studio_integration", "cublas", "curand", "nvrtc", "cudart"]'
           cuda: ${{ matrix.cuda }}
@@ -131,6 +135,7 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.8
         id: cuda-toolkit-l
         if: runner.os == 'Linux' && steps.cache-cuda.outputs.cache-hit != 'true'
+
         with:
           sub-packages: '["nvcc", "nvrtc", "cudart"]'
           cuda: ${{ matrix.cuda }}
@@ -192,6 +197,7 @@ jobs:
         run: cmake --build . --config ${{ env.config }} --target ALL_BUILD --verbose
         env:
           BOOST_ROOT: ${{ steps.install-boost-w.outputs.BOOST_ROOT }}
+
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
