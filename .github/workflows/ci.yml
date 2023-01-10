@@ -151,27 +151,24 @@ jobs:
       - name: Configure CMake (Windows)
         id: configure-w
         shell: bash
+        env:
+          BOOST_ROOT: ${{ steps.install-boost-w.outputs.BOOST_ROOT }}
         if: runner.os == 'Windows'
         run: |
           rm -f ${{ env.build_dir }}/CMakeCache.txt
-          if [ "${{ runner.os }}" = "Windows" ]
-          then
-            cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET="cuda=${{steps.cuda-toolkit-w.outputs.CUDA_PATH}}"
-          else
-            cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE
-          fi
-        env:
-          BOOST_ROOT: ${{ steps.install-boost-w.outputs.BOOST_ROOT }}
+          cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET="cuda=${{steps.cuda-toolkit-w.outputs.CUDA_PATH}}"
+        
 
       - name: Configure CMake (Linux)
         id: configure-l
         shell: bash
+        env:
+          BOOST_ROOT: ${{ steps.install-boost-l.outputs.BOOST_ROOT }}
         if: runner.os == 'Linux'
         run: |
           rm -f ${{ env.build_dir }}/CMakeCache.txt
           cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE
-        env:
-          BOOST_ROOT: ${{ steps.install-boost-l.outputs.BOOST_ROOT }}
+        
 
       - name: Configure Error Processing
         if: ${{ (failure() && steps.configure.outcome == 'failure') || success() }}
@@ -210,26 +207,16 @@ jobs:
 #             ./Gpufit_Cpufit_Patlak
 ##             ./Patlak_Fitting_Comparison
 
-      - name: Create Package (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: ./package/create_package.bat ${{ env.build_dir }} ${{ env.gpufit_version }} .
-
-      - name: Create Package (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: ./package/create_package.sh ${{ env.build_dir }} ${{ env.gpufit_version }} .
-
       - name: Upload Artifacts (Windows)
         uses: actions/upload-artifact@v3
         if: runner.os == 'Windows'
         with:
           name: ${{ matrix.os }}-x64-cuda-${{ matrix.cuda }}
-          path: ${{ env.build_dir }}/Gpufit_${{ env.gpufit_version }}_build*/
+          path: build/Release/**/*
 
       - name: Upload Artifacts (Linux)
         uses: actions/upload-artifact@v3
         if: runner.os == 'Linux'
         with:
           name: ${{ matrix.os }}-x64-cuda-${{ matrix.cuda }}
-          path: ${{ env.build_dir }}/install/Gpufit_${{ env.gpufit_version }}_linux.zip
+          path: build/**/*
