@@ -6,8 +6,8 @@
 
 void LMFitCUDA::solve_equation_systems_lup()
 {
-    dim3  threads(1, 1, 1);
-    dim3  blocks(1, 1, 1);
+    //dim3  threads(1, 1, 1);
+    //dim3  blocks(1, 1, 1);
 
     // initialize components of equation systems
     gpu_data_.copy(gpu_data_.decomposed_hessians_, gpu_data_.hessians_, n_fits_ * info_.n_parameters_to_fit_ * info_.n_parameters_to_fit_);
