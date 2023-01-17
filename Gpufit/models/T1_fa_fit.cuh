@@ -1,6 +1,6 @@
 #ifdef USE_T1_FA_EXPONENTIAL
 #define GPUFIT_T1_FA_EXPONENTIAL_CUH_INCLUDED
-
+#define PI 3.14159265359
 
 __device__ void calculate_t1_fa_exponential(
     float const * parameters,
@@ -17,11 +17,13 @@ __device__ void calculate_t1_fa_exponential(
 	// indices
 	REAL* user_info_float = (REAL*)user_info;
 	
-	// split user_info array into dependent variables theta and tr
+	// split user_info array into dependent variables theta (in degrees) and tr
 	REAL theta = 0;
 	REAL tr = 0;
-    theta = user_info_float[point_index];
+    theta = user_info_float[point_index] * PI/180;		// convert theta into radians for trig funcs
     tr = user_info_float[point_index + n_points];
+
+	// below commented code block is basically if you want to define every single data point and such
 	/*if (!user_info_float)
 	    {
 	        theta = point_index;
@@ -41,6 +43,7 @@ __device__ void calculate_t1_fa_exponential(
 	    }*/
 	//REAL* theta = user_info_float;
 	//REAL* tr = user_info_float + n_points;
+
 	///////////////////////////// value //////////////////////////////
 	// formula calculating fit model values
     value[point_index] = parameters[0] * ( (1 - exp(-tr/parameters[1])) * sin(theta)) / (1 - exp(-tr/parameters[1]) * cos(theta) );		// formula calculating fit model values
@@ -50,8 +53,6 @@ __device__ void calculate_t1_fa_exponential(
     float * current_derivative = derivative + point_index;
 
     current_derivative[0 * n_points] = ( (1 - exp(-tr/parameters[1])) * sin(theta)) / (1 - exp(-tr/parameters[1]) * cos(theta) );  // formula calculating derivative values with respect to parameters[0]
-    // current_derivative[1 * n_points] = ( parameters[0] * parameters[1] * exp(-tr/parameters[1]) * (cos(theta)-sin(theta)) ) / ( pow(parameters[1],2) * pow(exp(-tr/parameters[1]) - cos(theta), 2) );  // formula calculating derivative values with respect to parameters[1]
-	// current_derivative[1 * n_points] = (exp(tr/parameters[1]) * parameters[0] * tr * (cos(theta) - 1) * sin(theta)) / (pow(parameters[1],2) * pow(exp(tr/parameters[1]) - cos(theta),2));  // formula calculating derivative values with respect to parameters[1]
 	current_derivative[1 * n_points] = (parameters[0] * tr * sin(theta) * exp(tr/parameters[1]) * (cos(theta) - 1)) / (pow(parameters[1],2) * pow(exp(tr/parameters[1])-cos(theta),2));	// formula calculating derivative values with respect to parameters[1]
 
  }	
