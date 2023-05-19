@@ -41,14 +41,14 @@ set( DEFAULT_CUDA_ARCH All )
 set( DEFAULT_USE_CUBLAS OFF )
 
 # Set the default value for the precision
-set( DEFAULT_DOUBLE_PRECISION ON )
+# set( DEFAULT_DOUBLE_PRECISION ON )
 option( DOUBLE_PRECISION "WARNING: MEMORY INTENSIVE. Enable use of the double data type instead of float. Useful for n_fits >1 million." )
 
 # Precision
 
 # set( DOUBLE_PRECISION ${DEFAULT_DOUBLE_PRECISION} )
 
-if( DEFINED DOUBLE_PRECISION AND DOUBLE_PRECISION)
+if( DOUBLE_PRECISION )
     add_definitions( -DGPUFIT_DOUBLE )
 endif()
 

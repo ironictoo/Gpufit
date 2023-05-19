@@ -3,11 +3,11 @@
 #define PI 3.14159265359
 
 __device__ void calculate_t1_fa_exponential(
-    float const * parameters,
+    REAL const * parameters,
     int const n_fits,
     int const n_points,
-    float * value,
-    float * derivative,
+    REAL * value,
+    REAL * derivative,
     int const point_index,
     int const fit_index,
     int const chunk_index,
@@ -50,7 +50,7 @@ __device__ void calculate_t1_fa_exponential(
 	// si = a * ( (1 - e^(-tr/t1)) * sin(theta)) / (1 - e^(-tr/t1) * cost(theta) )
 	
     /////////////////////////// derivative ///////////////////////////
-    float * current_derivative = derivative + point_index;
+    REAL * current_derivative = derivative + point_index;
 
     current_derivative[0 * n_points] = ( (1 - exp(-tr/parameters[1])) * sin(theta)) / (1 - exp(-tr/parameters[1]) * cos(theta) );  // formula calculating derivative values with respect to parameters[0]
 	current_derivative[1 * n_points] = (parameters[0] * tr * sin(theta) * exp(tr/parameters[1]) * (cos(theta) - 1)) / (pow(parameters[1],2) * pow(exp(tr/parameters[1])-cos(theta),2));	// formula calculating derivative values with respect to parameters[1]
