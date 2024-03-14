@@ -797,9 +797,6 @@ void LMFitCPP::calc_derivatives_patlak(std::vector<REAL> & derivatives)
         derivatives[1 * info_.n_points_] = Cp[point_index];			// formula calculating derivative values with respect to parameters[1] (vp)
     }
 
-	// deallocate pointers
-	// delete T;
-	// delete Cp;
     //     REAL * user_info_float = (REAL*)user_info_;
     // REAL x = 0.;
 
@@ -1311,10 +1308,6 @@ void LMFitCPP::calc_values_patlak(std::vector<REAL>& values)
         //	C(t)		   =   Ktrans	   * trapz(Cp(k))  + vp     *    Cp(k)
         values[point_index] = parameters_[0] * convCp + parameters_[1] * Cp[point_index];
     }
-	// deallocate pointers
-	// delete T;
-	// delete Cp;
-
     // REAL * user_info_float = (REAL*)user_info_;
     // REAL x = 0.f;
     // for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
