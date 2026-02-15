@@ -45,12 +45,13 @@ jobs:
       build_dir: "build"
       config: "Release"
       gpufit_version: "1.2.0"
+      vcpkg_triplet: "x64-windows"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Python ${{ matrix.python }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "${{ matrix.python }}"
           cache: "pip"
@@ -62,6 +63,26 @@ jobs:
 
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2.6.1
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "8"
+
+      - name: Install Boost (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $vcpkg = Join-Path $env:VCPKG_INSTALLATION_ROOT "vcpkg.exe"
+          & $vcpkg install boost:${{ env.vcpkg_triplet }}
+
+      - name: Install Boost (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libboost-dev
 
       - name: Install CUDA (Windows)
         uses: Jimver/cuda-toolkit@v0.2.30
@@ -93,7 +114,7 @@ jobs:
         shell: bash
         run: |
           VSWHERE="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
-          VS_PATH=$($VSWHERE -latest -products '*' -property installationPath | tr -d '\r')
+          VS_PATH=$("$VSWHERE" -latest -products '*' -property installationPath | tr -d '\r')
           echo "Visual Studio path: $VS_PATH"
           cp -R "$CUDA_PATH/extras/visual_studio_integration/MSBuildExtensions/." "$VS_PATH/MSBuild/Microsoft/VC/${{ matrix.vc_toolset }}/BuildCustomizations"
 
@@ -115,7 +136,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           rm -f "${{ env.build_dir }}/CMakeCache.txt"
-          cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET="cuda=$CUDA_PATH" -DBUILD_TESTING=OFF
+          cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET="cuda=$CUDA_PATH" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ env.vcpkg_triplet }} -DBUILD_TESTING=ON
 
       - name: Configure CMake (Linux)
         id: configure-l
@@ -123,7 +144,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           rm -f "${{ env.build_dir }}/CMakeCache.txt"
-          cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_TESTING=OFF
+          cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_TESTING=ON
 
       - name: Configure Error Processing
         if: always()
@@ -155,15 +176,23 @@ jobs:
         working-directory: ${{ env.build_dir }}
         run: cmake --build . --verbose
 
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: ctest --test-dir "${{ env.build_dir }}" -C "${{ env.config }}" --output-on-failure
+
+      - name: Run tests (Linux)
+        if: runner.os == 'Linux'
+        run: ctest --test-dir "${{ env.build_dir }}" --output-on-failure
+
       - name: Upload Artifacts (Windows)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: runner.os == 'Windows'
         with:
           name: ${{ matrix.os }}-x64-cuda-${{ matrix.cuda }}
           path: build/Release/**/*
 
       - name: Upload Artifacts (Linux)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: runner.os == 'Linux'
         with:
           name: ${{ matrix.os }}-x64-cuda-${{ matrix.cuda }}
