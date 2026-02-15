@@ -50,7 +50,7 @@ jobs:
             python: "3.12"
 
           # macOS: Intel + Apple Silicon CPU-only validation
-          - os: macos-13
+          - os: macos-15-intel
             arch: x64
             with_cuda: false
             cuda: "cpu"

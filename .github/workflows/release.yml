@@ -136,7 +136,7 @@ jobs:
             cuda: "12.8.1"
             python: "3.12"
 
-          - os: macos-13
+          - os: macos-15-intel
             asset_id: macos-x64-cpu
             with_cuda: false
             python: "3.10"
