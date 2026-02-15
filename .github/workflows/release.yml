@@ -1,0 +1,436 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Git ref (branch, tag, or commit SHA) to build."
+        required: false
+        default: "dev"
+        type: string
+      release_tag:
+        description: "Optional release tag override (for manual dev builds)."
+        required: false
+        type: string
+      release_name:
+        description: "Optional release title override."
+        required: false
+        type: string
+  schedule:
+    - cron: "30 8 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Prepare Release Metadata
+    runs-on: ubuntu-24.04
+    outputs:
+      source_ref: ${{ steps.meta.outputs.source_ref }}
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+      release_name: ${{ steps.meta.outputs.release_name }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      release_notes: ${{ steps.meta.outputs.release_notes }}
+    steps:
+      - name: Derive metadata
+        id: meta
+        env:
+          INPUT_SOURCE_REF: ${{ github.event.inputs.source_ref }}
+          INPUT_RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          INPUT_RELEASE_NAME: ${{ github.event.inputs.release_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          event_name="${GITHUB_EVENT_NAME}"
+          utc_day="$(date -u +%Y%m%d)"
+          utc_stamp="$(date -u +%Y%m%d-%H%M)"
+          short_sha="${GITHUB_SHA::8}"
+
+          source_ref="dev"
+          release_tag=""
+          release_name=""
+          prerelease="true"
+          release_notes=""
+
+          if [[ "${event_name}" == "push" && "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            source_ref="${GITHUB_SHA}"
+            release_tag="${GITHUB_REF_NAME}"
+            release_name="Gpufit ${release_tag}"
+            prerelease="false"
+            release_notes="Automated point release for ${release_tag}."
+          elif [[ "${event_name}" == "schedule" ]]; then
+            source_ref="dev"
+            release_tag="nightly-${utc_day}"
+            release_name="Gpufit Nightly ${utc_day}"
+            prerelease="true"
+            release_notes="Automated nightly build from dev."
+          else
+            if [[ -n "${INPUT_SOURCE_REF:-}" ]]; then
+              source_ref="${INPUT_SOURCE_REF}"
+            else
+              source_ref="${GITHUB_REF_NAME}"
+            fi
+
+            if [[ -n "${INPUT_RELEASE_TAG:-}" ]]; then
+              release_tag="${INPUT_RELEASE_TAG}"
+            else
+              release_tag="dev-${utc_stamp}-${short_sha}"
+            fi
+
+            if [[ -n "${INPUT_RELEASE_NAME:-}" ]]; then
+              release_name="${INPUT_RELEASE_NAME}"
+            else
+              release_name="Gpufit Dev ${utc_stamp} (${short_sha})"
+            fi
+
+            prerelease="true"
+            release_notes="Manually triggered development build from ${source_ref}."
+          fi
+
+          {
+            echo "source_ref=${source_ref}"
+            echo "release_tag=${release_tag}"
+            echo "release_name=${release_name}"
+            echo "prerelease=${prerelease}"
+            echo "release_notes=${release_notes}"
+          } >> "${GITHUB_OUTPUT}"
+
+  build:
+    name: ${{ matrix.os }} ${{ matrix.asset_id }}
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            asset_id: windows-x64-cuda12.4
+            with_cuda: true
+            cuda: "12.4.1"
+            python: "3.10"
+            visual_studio: "Visual Studio 17 2022"
+            vc_toolset: "v170"
+
+          - os: windows-2025
+            asset_id: windows-x64-cuda12.8
+            with_cuda: true
+            cuda: "12.8.1"
+            python: "3.12"
+            visual_studio: "Visual Studio 17 2022"
+            vc_toolset: "v170"
+
+          - os: ubuntu-22.04
+            asset_id: linux-x64-cuda11.8
+            with_cuda: true
+            cuda: "11.8.0"
+            python: "3.10"
+
+          - os: ubuntu-24.04
+            asset_id: linux-x64-cuda12.8
+            with_cuda: true
+            cuda: "12.8.1"
+            python: "3.12"
+
+          - os: macos-13
+            asset_id: macos-x64-cpu
+            with_cuda: false
+            python: "3.10"
+
+          - os: macos-14
+            asset_id: macos-arm64-cpu
+            with_cuda: false
+            python: "3.12"
+
+    env:
+      build_dir: build
+      config: Release
+      vcpkg_triplet: x64-windows
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.source_ref }}
+          fetch-depth: 0
+
+      - name: Record source commit
+        shell: bash
+        run: |
+          echo "SOURCE_COMMIT=$(git rev-parse HEAD)" >> "${GITHUB_ENV}"
+
+      - name: Setup Python ${{ matrix.python }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: "${{ matrix.python }}"
+          cache: "pip"
+
+      - name: Upgrade Pip and Install wheel
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install wheel setuptools
+
+      - name: Setup Java 8 (for Gpufit Java package target)
+        if: matrix.with_cuda
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "8"
+
+      - name: Install Boost (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $vcpkg = Join-Path $env:VCPKG_INSTALLATION_ROOT "vcpkg.exe"
+          & $vcpkg install boost:${{ env.vcpkg_triplet }}
+
+      - name: Install Boost (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libboost-dev
+
+      - name: Install Boost (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if ! brew list --versions boost >/dev/null 2>&1; then
+            brew install boost
+          fi
+
+      - name: Install CUDA (Windows)
+        if: runner.os == 'Windows' && matrix.with_cuda
+        uses: Jimver/cuda-toolkit@v0.2.30
+        id: cuda-toolkit-w
+        with:
+          sub-packages: '["nvcc", "visual_studio_integration", "cublas", "curand", "nvrtc", "cudart"]'
+          cuda: ${{ matrix.cuda }}
+          method: network
+
+      - name: Export CUDA path from installer (Windows)
+        if: runner.os == 'Windows' && matrix.with_cuda
+        shell: bash
+        run: |
+          echo "CUDA_PATH=${{ steps.cuda-toolkit-w.outputs.CUDA_PATH }}" >> "${GITHUB_ENV}"
+          echo "${{ steps.cuda-toolkit-w.outputs.CUDA_PATH }}/bin" >> "${GITHUB_PATH}"
+
+      - name: Install CUDA (Linux)
+        if: runner.os == 'Linux' && matrix.with_cuda
+        uses: Jimver/cuda-toolkit@v0.2.30
+        id: cuda-toolkit-l
+        with:
+          sub-packages: '["nvcc", "nvrtc", "cudart"]'
+          cuda: ${{ matrix.cuda }}
+          method: network
+
+      - name: Enable CUDA BuildCustomizations (Windows)
+        if: runner.os == 'Windows' && matrix.with_cuda
+        shell: bash
+        run: |
+          VSWHERE="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          VS_PATH=$("$VSWHERE" -latest -products '*' -property installationPath | tr -d '\r')
+          echo "Visual Studio path: $VS_PATH"
+          cp -R "$CUDA_PATH/extras/visual_studio_integration/MSBuildExtensions/." "$VS_PATH/MSBuild/Microsoft/VC/${{ matrix.vc_toolset }}/BuildCustomizations"
+
+      - name: CUDA compiler check
+        if: matrix.with_cuda
+        shell: bash
+        run: |
+          nvcc -V
+
+      - name: Configure CMake (Windows CUDA)
+        if: runner.os == 'Windows' && matrix.with_cuda
+        shell: bash
+        run: |
+          rm -f "${{ env.build_dir }}/CMakeCache.txt"
+          cmake . -B "${{ env.build_dir }}" \
+            -G "${{ matrix.visual_studio }}" \
+            -A x64 \
+            -DCMAKE_GENERATOR_TOOLSET="cuda=$CUDA_PATH" \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=${{ env.vcpkg_triplet }} \
+            -DBUILD_TESTING=ON
+
+      - name: Configure CMake (Linux CUDA)
+        if: runner.os == 'Linux' && matrix.with_cuda
+        shell: bash
+        run: |
+          rm -f "${{ env.build_dir }}/CMakeCache.txt"
+          cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+
+      - name: Configure CMake (macOS CPU only)
+        if: runner.os == 'macOS' && !matrix.with_cuda
+        shell: bash
+        run: |
+          rm -f "${{ env.build_dir }}/CMakeCache.txt"
+          cmake . -B "${{ env.build_dir }}" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGPUFIT_ENABLE_CUDA=OFF \
+            -DBUILD_TESTING=OFF
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        working-directory: ${{ env.build_dir }}
+        shell: bash
+        run: cmake --build . --config ${{ env.config }} --target ALL_BUILD --verbose
+
+      - name: Build (Linux/macOS)
+        if: runner.os != 'Windows'
+        working-directory: ${{ env.build_dir }}
+        shell: bash
+        run: cmake --build . --verbose
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows' && matrix.with_cuda
+        shell: bash
+        run: ctest --test-dir "${{ env.build_dir }}" -C "${{ env.config }}" --output-on-failure
+
+      - name: Run tests (Linux)
+        if: runner.os == 'Linux' && matrix.with_cuda
+        shell: bash
+        run: ctest --test-dir "${{ env.build_dir }}" --output-on-failure
+
+      - name: Package binaries and wrappers
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          package_root="package"
+          release_root="${package_root}/gpufit-${{ needs.prepare.outputs.release_tag }}-${{ matrix.asset_id }}"
+          archive_path="${package_root}/gpufit-${{ needs.prepare.outputs.release_tag }}-${{ matrix.asset_id }}.tar.gz"
+
+          rm -rf "${package_root}"
+          mkdir -p "${release_root}/lib" "${release_root}/include/Cpufit" "${release_root}/python" "${release_root}/wheels"
+
+          cp LICENSE.txt "${release_root}/"
+          cp README.md "${release_root}/"
+          cp Cpufit/cpufit.h "${release_root}/include/Cpufit/"
+
+          cpufit_lib="$(find "${build_dir}" -type f \( -name 'Cpufit.dll' -o -name 'libCpufit.so*' -o -name 'libCpufit.dylib' \) | head -n 1 || true)"
+          if [[ -z "${cpufit_lib}" ]]; then
+            echo "Cpufit shared library not found."
+            exit 1
+          fi
+          cp "${cpufit_lib}" "${release_root}/lib/"
+
+          if [[ "${{ matrix.with_cuda }}" == "true" ]]; then
+            mkdir -p "${release_root}/include/Gpufit"
+            cp Gpufit/gpufit.h "${release_root}/include/Gpufit/"
+            gpufit_lib="$(find "${build_dir}" -type f \( -name 'Gpufit.dll' -o -name 'libGpufit.so*' -o -name 'libGpufit.dylib' \) | head -n 1 || true)"
+            if [[ -z "${gpufit_lib}" ]]; then
+              echo "Gpufit shared library not found for CUDA build."
+              exit 1
+            fi
+            cp "${gpufit_lib}" "${release_root}/lib/"
+          fi
+
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            cpufit_import_lib="$(find "${build_dir}" -type f -name 'Cpufit.lib' | head -n 1 || true)"
+            if [[ -n "${cpufit_import_lib}" ]]; then
+              cp "${cpufit_import_lib}" "${release_root}/lib/"
+            fi
+            gpufit_import_lib="$(find "${build_dir}" -type f -name 'Gpufit.lib' | head -n 1 || true)"
+            if [[ -n "${gpufit_import_lib}" ]]; then
+              cp "${gpufit_import_lib}" "${release_root}/lib/"
+            fi
+          fi
+
+          mkdir -p "${release_root}/python/src/Cpufit" "${release_root}/python/src/Gpufit"
+          cp Cpufit/python/setup.py "${release_root}/python/src/Cpufit/"
+          cp Cpufit/python/setup.cfg "${release_root}/python/src/Cpufit/"
+          cp Cpufit/python/README.txt "${release_root}/python/src/Cpufit/"
+          cp -R Cpufit/python/pycpufit "${release_root}/python/src/Cpufit/"
+
+          cp Gpufit/python/setup.py "${release_root}/python/src/Gpufit/"
+          cp Gpufit/python/setup.cfg "${release_root}/python/src/Gpufit/"
+          cp Gpufit/python/README.txt "${release_root}/python/src/Gpufit/"
+          cp -R Gpufit/python/pygpufit "${release_root}/python/src/Gpufit/"
+
+          cp "${cpufit_lib}" "${release_root}/python/src/Cpufit/pycpufit/"
+          if [[ "${{ matrix.with_cuda }}" == "true" ]]; then
+            cp "${gpufit_lib}" "${release_root}/python/src/Gpufit/pygpufit/"
+          fi
+
+          while IFS= read -r wheel_file; do
+            cp "${wheel_file}" "${release_root}/wheels/"
+          done < <(find "${build_dir}" -type f -path '*/dist/*.whl')
+
+          if [[ -z "$(find "${release_root}/wheels" -type f -print -quit)" ]]; then
+            rmdir "${release_root}/wheels"
+          fi
+
+          cat > "${release_root}/BUILD_INFO.txt" <<EOF
+          Release tag: ${{ needs.prepare.outputs.release_tag }}
+          Source ref: ${{ needs.prepare.outputs.source_ref }}
+          Source commit: ${SOURCE_COMMIT}
+          Runner: ${RUNNER_OS}
+          Asset id: ${{ matrix.asset_id }}
+          CUDA build: ${{ matrix.with_cuda }}
+          CUDA toolkit: ${{ matrix.cuda }}
+          EOF
+
+          tar -C "${package_root}" -czf "${archive_path}" "$(basename "${release_root}")"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: package-${{ matrix.asset_id }}
+          path: package/*.tar.gz
+
+  publish:
+    name: Publish GitHub Release
+    needs:
+      - prepare
+      - build
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: release-assets
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-assets
+          sha256sum *.tar.gz > SHA256SUMS.txt
+          ls -lh
+
+      - name: Create or update release
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          RELEASE_NAME: ${{ needs.prepare.outputs.release_name }}
+          RELEASE_NOTES: ${{ needs.prepare.outputs.release_notes }}
+          RELEASE_PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+          RELEASE_TARGET: ${{ needs.prepare.outputs.source_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          asset_files=(release-assets/*.tar.gz release-assets/SHA256SUMS.txt)
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" "${asset_files[@]}" --clobber
+            if [[ "${RELEASE_PRERELEASE}" == "true" ]]; then
+              gh release edit "${RELEASE_TAG}" --title "${RELEASE_NAME}" --notes "${RELEASE_NOTES}" --prerelease
+            else
+              gh release edit "${RELEASE_TAG}" --title "${RELEASE_NAME}" --notes "${RELEASE_NOTES}" --latest
+            fi
+          else
+            create_args=("${RELEASE_TAG}" "${asset_files[@]}" "--title" "${RELEASE_NAME}" "--notes" "${RELEASE_NOTES}" "--target" "${RELEASE_TARGET}")
+            if [[ "${RELEASE_PRERELEASE}" == "true" ]]; then
+              create_args+=("--prerelease")
+            fi
+            gh release create "${create_args[@]}"
+          fi
