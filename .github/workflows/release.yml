@@ -9,7 +9,6 @@ on:
       source_ref:
         description: "Git ref (branch, tag, or commit SHA) to build."
         required: false
-        default: "dev"
         type: string
       release_tag:
         description: "Optional release tag override (for manual dev builds)."
@@ -51,7 +50,7 @@ jobs:
           utc_stamp="$(date -u +%Y%m%d-%H%M)"
           short_sha="${GITHUB_SHA::8}"
 
-          source_ref="dev"
+          source_ref="${GITHUB_REF_NAME}"
           release_tag=""
           release_name=""
           prerelease="true"
@@ -64,11 +63,10 @@ jobs:
             prerelease="false"
             release_notes="Automated point release for ${release_tag}."
           elif [[ "${event_name}" == "schedule" ]]; then
-            source_ref="dev"
             release_tag="nightly-${utc_day}"
             release_name="Gpufit Nightly ${utc_day}"
             prerelease="true"
-            release_notes="Automated nightly build from dev."
+            release_notes="Automated nightly build from ${source_ref}."
           else
             if [[ -n "${INPUT_SOURCE_REF:-}" ]]; then
               source_ref="${INPUT_SOURCE_REF}"
@@ -187,7 +185,26 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $vcpkg = Join-Path $env:VCPKG_INSTALLATION_ROOT "vcpkg.exe"
-          & $vcpkg install boost:${{ env.vcpkg_triplet }}
+          $maxAttempts = 3
+          $attempt = 1
+          $success = $false
+          while ($attempt -le $maxAttempts -and -not $success) {
+            Write-Host "vcpkg boost install attempt $attempt of $maxAttempts"
+            & $vcpkg install boost:${{ env.vcpkg_triplet }}
+            if ($LASTEXITCODE -eq 0) {
+              $success = $true
+              break
+            }
+            if ($attempt -lt $maxAttempts) {
+              $sleepSeconds = 30 * $attempt
+              Write-Host "Install failed with exit code $LASTEXITCODE. Retrying in $sleepSeconds seconds..."
+              Start-Sleep -Seconds $sleepSeconds
+            }
+            $attempt++
+          }
+          if (-not $success) {
+            throw "vcpkg install boost failed after $maxAttempts attempts."
+          }
 
       - name: Install Boost (Linux)
         if: runner.os == 'Linux'
