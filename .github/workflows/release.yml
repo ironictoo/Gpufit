@@ -175,7 +175,7 @@ jobs:
           pip install wheel setuptools
 
       - name: Setup Java 8 (for Gpufit Java package target)
-        if: matrix.with_cuda
+        if: runner.os != 'Windows' && matrix.with_cuda
         uses: actions/setup-java@v5
         with:
           distribution: "temurin"
@@ -255,7 +255,9 @@ jobs:
             -DCMAKE_GENERATOR_TOOLSET="cuda=$CUDA_PATH" \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET=${{ env.vcpkg_triplet }} \
-            -DBUILD_TESTING=ON
+            -DBUILD_TESTING=ON \
+            -DCMAKE_DISABLE_FIND_PACKAGE_Java=TRUE \
+            -DCMAKE_DISABLE_FIND_PACKAGE_JNI=TRUE
 
       - name: Configure CMake (Linux CUDA)
         if: runner.os == 'Linux' && matrix.with_cuda

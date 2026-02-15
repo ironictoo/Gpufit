@@ -13,7 +13,7 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.os }} cuda-${{ matrix.cuda }} python-${{ matrix.python }}
+    name: ${{ matrix.os }} ${{ matrix.arch }} cuda-${{ matrix.cuda }} python-${{ matrix.python }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -21,12 +21,16 @@ jobs:
         include:
           # Windows: old/new supported runner + old/new CUDA
           - os: windows-2022
+            arch: x64
+            with_cuda: true
             cuda: "12.4.1"
             visual_studio: "Visual Studio 17 2022"
             vc_toolset: "v170"
             python: "3.10"
 
           - os: windows-2025
+            arch: x64
+            with_cuda: true
             cuda: "12.8.1"
             visual_studio: "Visual Studio 17 2022"
             vc_toolset: "v170"
@@ -34,11 +38,28 @@ jobs:
 
           # Linux: old/new supported runner + old/new CUDA
           - os: ubuntu-22.04
+            arch: x64
+            with_cuda: true
             cuda: "11.8.0"
             python: "3.10"
 
           - os: ubuntu-24.04
+            arch: x64
+            with_cuda: true
             cuda: "12.8.1"
+            python: "3.12"
+
+          # macOS: Intel + Apple Silicon CPU-only validation
+          - os: macos-13
+            arch: x64
+            with_cuda: false
+            cuda: "cpu"
+            python: "3.10"
+
+          - os: macos-14
+            arch: arm64
+            with_cuda: false
+            cuda: "cpu"
             python: "3.12"
 
     env:
@@ -65,6 +86,7 @@ jobs:
         uses: matlab-actions/setup-matlab@v2.6.1
 
       - name: Setup Java
+        if: runner.os != 'Windows' && matrix.with_cuda
         uses: actions/setup-java@v5
         with:
           distribution: "temurin"
@@ -84,33 +106,40 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libboost-dev
 
+      - name: Install Boost (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if ! brew list --versions boost >/dev/null 2>&1; then
+            brew install boost
+          fi
+
       - name: Install CUDA (Windows)
+        if: runner.os == 'Windows' && matrix.with_cuda
         uses: Jimver/cuda-toolkit@v0.2.30
         id: cuda-toolkit-w
-        if: runner.os == 'Windows'
         with:
           sub-packages: '["nvcc", "visual_studio_integration", "cublas", "curand", "nvrtc", "cudart"]'
           cuda: ${{ matrix.cuda }}
           method: network
 
       - name: Export CUDA path from installer (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.with_cuda
         shell: bash
         run: |
           echo "CUDA_PATH=${{ steps.cuda-toolkit-w.outputs.CUDA_PATH }}" >> "$GITHUB_ENV"
           echo "${{ steps.cuda-toolkit-w.outputs.CUDA_PATH }}/bin" >> "$GITHUB_PATH"
 
       - name: Install CUDA (Linux)
+        if: runner.os == 'Linux' && matrix.with_cuda
         uses: Jimver/cuda-toolkit@v0.2.30
         id: cuda-toolkit-l
-        if: runner.os == 'Linux'
         with:
           sub-packages: '["nvcc", "nvrtc", "cudart"]'
           cuda: ${{ matrix.cuda }}
           method: network
 
       - name: Enable CUDA BuildCustomizations (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.with_cuda
         shell: bash
         run: |
           VSWHERE="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
@@ -119,6 +148,7 @@ jobs:
           cp -R "$CUDA_PATH/extras/visual_studio_integration/MSBuildExtensions/." "$VS_PATH/MSBuild/Microsoft/VC/${{ matrix.vc_toolset }}/BuildCustomizations"
 
       - name: nvcc check
+        if: matrix.with_cuda
         shell: bash
         run: |
           nvcc -V
@@ -136,7 +166,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           rm -f "${{ env.build_dir }}/CMakeCache.txt"
-          cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET="cuda=$CUDA_PATH" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ env.vcpkg_triplet }} -DBUILD_TESTING=ON
+          cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET="cuda=$CUDA_PATH" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ env.vcpkg_triplet }} -DBUILD_TESTING=ON -DCMAKE_DISABLE_FIND_PACKAGE_Java=TRUE -DCMAKE_DISABLE_FIND_PACKAGE_JNI=TRUE
 
       - name: Configure CMake (Linux)
         id: configure-l
@@ -145,6 +175,14 @@ jobs:
         run: |
           rm -f "${{ env.build_dir }}/CMakeCache.txt"
           cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_TESTING=ON
+
+      - name: Configure CMake (macOS CPU-only)
+        id: configure-m
+        shell: bash
+        if: runner.os == 'macOS'
+        run: |
+          rm -f "${{ env.build_dir }}/CMakeCache.txt"
+          cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE -DGPUFIT_ENABLE_CUDA=OFF -DBUILD_TESTING=ON
 
       - name: Configure Error Processing
         if: always()
@@ -171,8 +209,8 @@ jobs:
         working-directory: ${{ env.build_dir }}
         run: cmake --build . --config ${{ env.config }} --target ALL_BUILD --verbose
 
-      - name: Build (Linux)
-        if: runner.os == 'Linux'
+      - name: Build (Linux/macOS)
+        if: runner.os != 'Windows'
         working-directory: ${{ env.build_dir }}
         run: cmake --build . --verbose
 
@@ -180,20 +218,20 @@ jobs:
         if: runner.os == 'Windows'
         run: ctest --test-dir "${{ env.build_dir }}" -C "${{ env.config }}" --output-on-failure
 
-      - name: Run tests (Linux)
-        if: runner.os == 'Linux'
+      - name: Run tests (Linux/macOS)
+        if: runner.os != 'Windows'
         run: ctest --test-dir "${{ env.build_dir }}" --output-on-failure
 
       - name: Upload Artifacts (Windows)
         uses: actions/upload-artifact@v6
         if: runner.os == 'Windows'
         with:
-          name: ${{ matrix.os }}-x64-cuda-${{ matrix.cuda }}
+          name: ${{ matrix.os }}-${{ matrix.arch }}-cuda-${{ matrix.cuda }}
           path: build/Release/**/*
 
-      - name: Upload Artifacts (Linux)
+      - name: Upload Artifacts (Linux/macOS)
         uses: actions/upload-artifact@v6
-        if: runner.os == 'Linux'
+        if: runner.os != 'Windows'
         with:
-          name: ${{ matrix.os }}-x64-cuda-${{ matrix.cuda }}
+          name: ${{ matrix.os }}-${{ matrix.arch }}-cuda-${{ matrix.cuda }}
           path: build/**/*
