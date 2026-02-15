@@ -130,7 +130,7 @@ cp "$SOURCE_BASE/LICENSE.txt" "$PACKAGE_INSTALL"
 
 echo collect performance test application
 mkdir $PERFORMANCE_TEST_INSTALL
-cp "$EXAMPLES_SOURCE/Gpufit_Cpufit_Performance_Comparison_readme.txt" "$PERFORMANCE_TEST_INSTALL/README.txt"
+cp "$EXAMPLES_SOURCE/c++/gpu_vs_cpu_profiling/Gpufit_Cpufit_Performance_Comparison_readme.txt" "$PERFORMANCE_TEST_INSTALL/README.txt"
 
 mkdir $PERFORMANCE_TEST_INSTALL/linux
 cp "$x64_BUILD/Gpufit_Cpufit_Performance_Comparison" "$PERFORMANCE_TEST_INSTALL/linux"
@@ -144,7 +144,7 @@ echo collect python
 mkdir $PYTHON_INSTALL
 cp "$x64_PYTHON_BUILD/pyGpufit-$VERSION-py2.py3-none-any.whl" "$PYTHON_INSTALL/pyGpufit-$VERSION-py2.py3-none-any.whl"
 cp "$PYTHON_SOURCE/README.txt" "$PYTHON_INSTALL"
-cp "$PYTHON_SOURCE/examples" "$PYTHON_INSTALL/examples" -n -r
+cp "$EXAMPLES_SOURCE/python" "$PYTHON_INSTALL/examples" -n -r
 
 
 # copy Matlab 64 bit
@@ -152,7 +152,7 @@ cp "$PYTHON_SOURCE/examples" "$PYTHON_INSTALL/examples" -n -r
 echo collect matlab64
 mkdir $x64_MATLAB_INSTALL
 cp "$x64_MATLAB_BUILD" "$x64_MATLAB_INSTALL" -r
-cp "$MATLAB_SOURCE/examples" "$x64_MATLAB_INSTALL/examples" -n -r
+cp "$EXAMPLES_SOURCE/matlab" "$x64_MATLAB_INSTALL/examples" -n -r
 
 
 # copy Java 64 bit

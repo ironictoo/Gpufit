@@ -16,19 +16,6 @@ function( add_cuda_example module name )
 endfunction()
 
 # Examples
-function( add_example modules name )
-  set( target ${name} )
-  add_executable( ${target} ${name}.cpp
-    ${PROJECT_SOURCE_DIR}/tests/utils.h
-    ${PROJECT_SOURCE_DIR}/tests/utils.cpp
-  )
-  target_include_directories( ${target} PRIVATE ${PROJECT_SOURCE_DIR} )
-  target_link_libraries( ${target} ${modules} )
-  set_property( TARGET ${target}
-    PROPERTY RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}" )
-  set_property( TARGET ${target} PROPERTY FOLDER GpufitCpufitExamples )
-#  install( TARGETS ${target} RUNTIME DESTINATION bin )
-endfunction()
 
 if ( GPUFIT_USE_BASE_MODELS )
 	add_example( Gpufit Simple_Example )
