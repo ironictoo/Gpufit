@@ -6,13 +6,14 @@
 
 from setuptools import setup, find_packages
 import os
+import sys
 from io import open # to have encoding as parameter of open on Python >=2.6
 import pygpufit.version as vs
 
 if os.name == 'nt':
 	lib_ext = '.dll' # library name extension on Windows
 elif os.name == 'posix':
-	lib_ext = '.so'  # library name extensions on Unix
+	lib_ext = '.dylib' if sys.platform == 'darwin' else '.so'  # library name extension on Unix/macOS
 else:
 	raise RuntimeError('OS {} not supported'.format(os.name))
 

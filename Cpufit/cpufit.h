@@ -1,7 +1,7 @@
 #ifndef CPU_FIT_H_INCLUDED
 #define CPU_FIT_H_INCLUDED
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 #define VISIBLE __attribute__((visibility("default")))
 #endif
 

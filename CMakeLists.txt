@@ -9,7 +9,7 @@ set_property( GLOBAL PROPERTY USE_FOLDERS ON )
 cmake_policy(SET CMP0091 NEW)
 
 if( NOT PROJECT_NAME )
-  project( Gpufit VERSION 1.2.0 LANGUAGES CUDA CXX)
+  project( Gpufit VERSION 1.2.0 LANGUAGES CXX )
   include( CTest )
 endif()
 
@@ -43,6 +43,22 @@ set( DEFAULT_USE_CUBLAS OFF )
 # Set the default value for the precision
 set( DEFAULT_DOUBLE_PRECISION ON )
 option( DOUBLE_PRECISION "WARNING: MEMORY INTENSIVE. Enable use of the double data type instead of float. Useful for n_fits >1 million." )
+option( GPUFIT_ENABLE_CUDA "Build CUDA-enabled Gpufit components. Disable for CPU-only builds." ON )
+
+set( GPUFIT_WITH_CUDA OFF )
+if( GPUFIT_ENABLE_CUDA )
+  include( CheckLanguage )
+  check_language( CUDA )
+  if( CMAKE_CUDA_COMPILER )
+    enable_language( CUDA )
+    set( GPUFIT_WITH_CUDA ON )
+    message( STATUS "CUDA compiler found: ${CMAKE_CUDA_COMPILER}" )
+  else()
+    message( WARNING "CUDA toolkit (nvcc) was not found. Building CPU-only Cpufit. Most users typically want CUDA-enabled Gpufit; install CUDA and reconfigure, or set -DGPUFIT_ENABLE_CUDA=OFF to silence this warning." )
+  endif()
+else()
+  message( STATUS "GPUFIT_ENABLE_CUDA=OFF. Building CPU-only Cpufit." )
+endif()
 
 # Precision
 
@@ -127,18 +143,22 @@ endif()
 
 add_subdirectory( Cpufit )
 
-# Gpufit
+if( GPUFIT_WITH_CUDA )
+  # Gpufit
+  add_subdirectory( Gpufit )
 
-add_subdirectory( Gpufit )
-
-# Examples using Gpufit and Cpufit
-
-add_subdirectory( examples/c++/gpu_vs_cpu_profiling )
+  # Examples using Gpufit and Cpufit
+  add_subdirectory( examples/c++/gpu_vs_cpu_profiling )
+else()
+  message( STATUS "CUDA components are disabled: skipping Gpufit library, GPU bindings/examples, and GPU-vs-CPU profiling tools." )
+endif()
 
 
 # link runtime statically with MSVC
-set_property(TARGET Gpufit PROPERTY
-  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+if( TARGET Gpufit )
+  set_property(TARGET Gpufit PROPERTY
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 set_property(TARGET Cpufit PROPERTY
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
@@ -160,21 +180,26 @@ endif()
 
 if( Matlab_FOUND )
   set( Matlab_WORKING_DIRECTORY "${home}" CACHE PATH "MATLAB working directory" )
-  if( Matlab_WORKING_DIRECTORY )
+  if( Matlab_WORKING_DIRECTORY AND ( TARGET CpufitMex OR TARGET GpufitMex ) )
     add_custom_target( RUN_MATLAB )
     set_property( TARGET RUN_MATLAB PROPERTY FOLDER CMakePredefinedTargets )
-    add_dependencies( RUN_MATLAB CpufitMex GpufitMex )
-    add_matlab_launcher( RUN_MATLAB
-      "${CMAKE_SOURCE_DIR}/Cpufit/matlab"
-      "${CMAKE_SOURCE_DIR}/Gpufit/matlab"
-      "${Matlab_WORKING_DIRECTORY}"
-    )
+    set( matlab_paths )
+    if( TARGET CpufitMex )
+      add_dependencies( RUN_MATLAB CpufitMex )
+      list( APPEND matlab_paths "${CMAKE_SOURCE_DIR}/Cpufit/matlab" )
+    endif()
+    if( TARGET GpufitMex )
+      add_dependencies( RUN_MATLAB GpufitMex )
+      list( APPEND matlab_paths "${CMAKE_SOURCE_DIR}/Gpufit/matlab" )
+    endif()
+    list( APPEND matlab_paths "${Matlab_WORKING_DIRECTORY}" )
+    add_matlab_launcher( RUN_MATLAB ${matlab_paths} )
   endif()
 endif()
 
 if( Python_FOUND )
   set( Python_WORKING_DIRECTORY "${home}" CACHE PATH "Python working directory" )
-  if( Python_WORKING_DIRECTORY )
+  if( TARGET Gpufit AND Python_WORKING_DIRECTORY )
     add_custom_target( RUN_PYTHON )
     set_property( TARGET RUN_PYTHON PROPERTY FOLDER CMakePredefinedTargets )
     add_dependencies( RUN_PYTHON Gpufit )
@@ -183,7 +208,7 @@ if( Python_FOUND )
       "${Python_WORKING_DIRECTORY}"
     )
   endif()
-  if( UNIX )
+  if( TARGET Gpufit AND UNIX )
     # Copy over install file for python integration
     file(COPY "${CMAKE_SOURCE_DIR}/package/install_gpufit_python.sh"
       DESTINATION "${CMAKE_BINARY_DIR}" 
@@ -195,7 +220,11 @@ endif()
 # Tests
 
 if( BUILD_TESTING )
-  add_subdirectory( tests )
+  if( TARGET Gpufit )
+    add_subdirectory( tests )
+  else()
+    message( WARNING "BUILD_TESTING is ON, but the top-level test suite requires Gpufit/CUDA. Skipping tests in CPU-only mode." )
+  endif()
 endif()
 
 # Package

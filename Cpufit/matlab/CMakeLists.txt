@@ -57,7 +57,9 @@ add_custom_target( MATLAB_CPUFIT_GPUFIT_PACKAGE ALL
   COMMENT "Adding Cpufit to Matlab package"
 )
 set_property( TARGET MATLAB_CPUFIT_GPUFIT_PACKAGE PROPERTY FOLDER CMakePredefinedTargets )
-add_dependencies( MATLAB_CPUFIT_GPUFIT_PACKAGE MATLAB_GPUFIT_PACKAGE Cpufit CpufitMex )
+add_dependencies( MATLAB_CPUFIT_GPUFIT_PACKAGE Cpufit CpufitMex )
+if( TARGET MATLAB_GPUFIT_PACKAGE )
+  add_dependencies( MATLAB_CPUFIT_GPUFIT_PACKAGE MATLAB_GPUFIT_PACKAGE )
+endif()
 
 # add launcher
-

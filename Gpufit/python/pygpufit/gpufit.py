@@ -7,9 +7,18 @@ See https://docs.python.org/3.5/library/ctypes.html, http://www.scipy-lectures.o
 """
 
 import os
+import sys
 import time
 from ctypes import cdll, POINTER, byref, c_int, c_float, c_char, c_char_p, c_size_t
 import numpy as np
+
+try:
+    import pycpufit.cpufit as _cpufit_backend
+except Exception as exception:
+    _cpufit_backend = None
+    _cpufit_backend_error = exception
+else:
+    _cpufit_backend_error = None
 
 # define library loader (actual loading is lazy)
 package_dir = os.path.dirname(os.path.realpath(__file__))
@@ -17,33 +26,47 @@ package_dir = os.path.dirname(os.path.realpath(__file__))
 if os.name == 'nt':
     lib_path = os.path.join(package_dir, 'Gpufit.dll')  # library name on Windows
 elif os.name == 'posix':
-    lib_path = os.path.join(package_dir, 'libGpufit.so')  # library name on Unix
+    if sys.platform == 'darwin':
+        lib_path = os.path.join(package_dir, 'libGpufit.dylib')
+    else:
+        lib_path = os.path.join(package_dir, 'libGpufit.so')  # library name on Unix
 else:
     raise RuntimeError('OS {} not supported by pyGpufit.'.format(os.name))
 
-lib = cdll.LoadLibrary(lib_path)
+_gpufit_load_error = None
+try:
+    lib = cdll.LoadLibrary(lib_path)
+except OSError as exception:
+    lib = None
+    _gpufit_load_error = exception
 
-# gpufit_constrained function in the dll
-gpufit_func = lib.gpufit_constrained
-gpufit_func.restype = c_int
-gpufit_func.argtypes = [c_size_t, c_size_t, POINTER(c_float), POINTER(c_float), c_int, POINTER(c_float),
-                        POINTER(c_float), POINTER(c_int), c_float, c_int, POINTER(c_int), c_int, c_size_t,
-                        POINTER(c_char), POINTER(c_float), POINTER(c_int), POINTER(c_float), POINTER(c_int)]
+if lib is not None:
+    # gpufit_constrained function in the dll
+    gpufit_func = lib.gpufit_constrained
+    gpufit_func.restype = c_int
+    gpufit_func.argtypes = [c_size_t, c_size_t, POINTER(c_float), POINTER(c_float), c_int, POINTER(c_float),
+                            POINTER(c_float), POINTER(c_int), c_float, c_int, POINTER(c_int), c_int, c_size_t,
+                            POINTER(c_char), POINTER(c_float), POINTER(c_int), POINTER(c_float), POINTER(c_int)]
 
-# gpufit_get_last_error function in the dll
-error_func = lib.gpufit_get_last_error
-error_func.restype = c_char_p
-error_func.argtypes = None
+    # gpufit_get_last_error function in the dll
+    error_func = lib.gpufit_get_last_error
+    error_func.restype = c_char_p
+    error_func.argtypes = None
 
-# gpufit_cuda_available function in the dll
-cuda_available_func = lib.gpufit_cuda_available
-cuda_available_func.restype = c_int
-cuda_available_func.argtypes = None
+    # gpufit_cuda_available function in the dll
+    cuda_available_func = lib.gpufit_cuda_available
+    cuda_available_func.restype = c_int
+    cuda_available_func.argtypes = None
 
-# gpufit_get_cuda_version function in the dll
-get_cuda_version_func = lib.gpufit_get_cuda_version
-get_cuda_version_func.restype = c_int
-get_cuda_version_func.argtypes = [POINTER(c_int), POINTER(c_int)]
+    # gpufit_get_cuda_version function in the dll
+    get_cuda_version_func = lib.gpufit_get_cuda_version
+    get_cuda_version_func.restype = c_int
+    get_cuda_version_func.argtypes = [POINTER(c_int), POINTER(c_int)]
+else:
+    gpufit_func = None
+    error_func = None
+    cuda_available_func = None
+    get_cuda_version_func = None
 
 
 class ModelID:
@@ -64,6 +87,12 @@ class ModelID:
     LIVER_FAT_THREE = 14
     LIVER_FAT_FOUR = 15
     EXPONENTIAL = 16
+    PATLAK = 17
+    TOFTS = 18
+    TOFTS_EXTENDED = 19
+    TISSUE_UPTAKE = 20
+    TWO_COMPARTMENT_EXCHANGE = 21
+    T1_FA_EXPONENTIAL = 22
 
 class EstimatorID():
 
@@ -81,6 +110,32 @@ class ConstraintType:
 class Status:
     Ok = 0
     Error = 1
+
+
+def _decode_error_message(error_message):
+    if isinstance(error_message, bytes):
+        return error_message.decode('utf-8', errors='replace')
+    return str(error_message)
+
+
+def _gpufit_unavailable_message():
+    if _gpufit_load_error is None:
+        return 'Gpufit library is not available.'
+    message = 'Gpufit library could not be loaded: {}'.format(_gpufit_load_error)
+    if _cpufit_backend is None and _cpufit_backend_error is not None:
+        message += ' Cpufit fallback is also unavailable: {}'.format(_cpufit_backend_error)
+    return message
+
+
+def _should_use_cpufit_backend():
+    if _cpufit_backend is None:
+        return False
+    if gpufit_func is None:
+        return True
+    try:
+        return cuda_available_func() == 0
+    except Exception:
+        return False
 
 
 def _valid_id(cls, id):
@@ -139,6 +194,25 @@ def fit_constrained(data, weights, model_id, initial_parameters, constraints=Non
     :param user_info: User info - NumPy array of type np.char or None (no user info available)
     :return: parameters, states, chi_squares, number_iterations, execution_time
     """
+
+    # Fall back to CpuFit if CUDA is unavailable and pycpufit is installed.
+    if _should_use_cpufit_backend():
+        return _cpufit_backend.fit_constrained(
+            data,
+            weights,
+            model_id,
+            initial_parameters,
+            constraints=constraints,
+            constraint_types=constraint_types,
+            tolerance=tolerance,
+            max_number_iterations=max_number_iterations,
+            parameters_to_fit=parameters_to_fit,
+            estimator_id=estimator_id,
+            user_info=user_info,
+        )
+
+    if gpufit_func is None:
+        raise RuntimeError(_gpufit_unavailable_message())
 
     # check all 2D NumPy arrays for row-major memory layout (otherwise interpretation of order of dimensions fails)
     if not data.flags.c_contiguous:
@@ -282,7 +356,7 @@ def fit_constrained(data, weights, model_id, initial_parameters, constraints=Non
     # check status
     if status != Status.Ok:
         # get error from last error and raise runtime error
-        error_message = error_func()
+        error_message = _decode_error_message(error_func())
         raise RuntimeError('status = {}, message = {}'.format(status, error_message))
 
     # return output values
@@ -293,13 +367,19 @@ def get_last_error():
     """
     :return: Error message of last error.
     """
-    return error_func()
+    if error_func is None:
+        if _cpufit_backend is not None:
+            return _cpufit_backend.get_last_error()
+        return _gpufit_unavailable_message()
+    return _decode_error_message(error_func())
 
 
 def cuda_available():
     """
     :return: True if CUDA is available, False otherwise
     """
+    if cuda_available_func is None:
+        return False
     return cuda_available_func() != 0
 
 
@@ -307,6 +387,9 @@ def get_cuda_version():
     """
     :return: Tuple with runtime and driver version as integers.
     """
+    if get_cuda_version_func is None:
+        raise RuntimeError(_gpufit_unavailable_message())
+
     runtime_version = c_int(-1)
     driver_version = c_int(-1)
     status = get_cuda_version_func(byref(runtime_version), byref(driver_version))
@@ -314,7 +397,7 @@ def get_cuda_version():
     # check status
     if status != Status.Ok:
         # get error from last error and raise runtime error
-        error_message = error_func()
+        error_message = _decode_error_message(error_func())
         raise RuntimeError('status = {}, message = {}'.format(status, error_message))
 
     # decode versions
