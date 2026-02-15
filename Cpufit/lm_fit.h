@@ -118,6 +118,9 @@ private:
     void calc_values_patlak(std::vector<REAL>& values);
     void calc_derivatives_patlak(std::vector<REAL> & derivatives);
 
+    void calc_values_tofts(std::vector<REAL>& values);
+    void calc_derivatives_tofts(std::vector<REAL> & derivatives);
+
     void calculate_hessian(std::vector<REAL> const & derivatives,
         std::vector<REAL> const & curve);
 

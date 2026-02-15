@@ -17,3 +17,8 @@ Gpufit/java/gpufit/out
 .vscode
 .project
 *.code-workspace
+
+# build
+/build
+/build_*/
+/build-*/

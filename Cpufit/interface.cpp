@@ -120,6 +120,9 @@ void FitInterface::set_number_of_parameters(ModelID const model_id)
     case PATLAK:
         n_parameters_ = 2;
         break;
+    case TOFTS:
+        n_parameters_ = 2;
+        break;
     default:
         throw std::runtime_error("unknown model ID");
     }

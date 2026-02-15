@@ -11,7 +11,7 @@ __device__ REAL get_value (
 {
 	// integral/convolution
 	REAL convFunc = 0;
-	for (int i = 1; i < point_index; i++) {
+	for (int i = 1; i <= point_index; i++) {
 		REAL spacing = T[i] - T[i - 1];
 		REAL Ct = Cp[i] * exp(-p0 * (T[point_index]-T[i]) / p1);
 		REAL Ctprev = Cp[i - 1] * exp(-p0 * (T[point_index]-T[i-1]) / p1);
@@ -77,7 +77,7 @@ __device__ void calculate_tofts_extended (               // function name
 	{
 		// formula calculating derivative values with respect to parameters[0] (Ktrans)
 		REAL derivativeFunction = 0;
-		for (int i = 1; i < point_index; i++) {
+		for (int i = 1; i <= point_index; i++) {
 			REAL spacing = T[i] - T[i - 1];
 			REAL Ct = Cp[i] * (1-parameters[0]/parameters[1]*(T[point_index]-T[i])) * exp(-parameters[0] * (T[point_index]-T[i]) / parameters[1]);
 			REAL Ctprev = Cp[i - 1] * (1-parameters[0]/parameters[1]*(T[point_index]-T[i-1])) * exp(-parameters[0] * (T[point_index]-T[i-1]) / parameters[1]);
@@ -87,7 +87,7 @@ __device__ void calculate_tofts_extended (               // function name
 
 		// formula calculating derivative values with respect to parameters[1] (Ve)
 		derivativeFunction = 0;
-		for (int i = 1; i < point_index; i++) {
+		for (int i = 1; i <= point_index; i++) {
 			REAL spacing = T[i] - T[i - 1];
 			REAL Ct = Cp[i] * (T[point_index]-T[i]) * exp(-parameters[0] * (T[point_index]-T[i]) / parameters[1]);
 			REAL Ctprev = Cp[i - 1] * (T[point_index]-T[i-1]) * exp(-parameters[0] * (T[point_index]-T[i-1]) / parameters[1]);

@@ -6,10 +6,32 @@
 #include <numeric>
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 // TODO if std::size_t and int are not the same, we will get lots of C26451 warnings here related to it, they can be ignored or
 // int should be converted to size_t but be careful, there is at least one for loop that checks for >=0 which only works with int that way
 // MS C compiler 16.1 (2019) shows the behavior for example
+
+namespace
+{
+REAL tofts_get_value(
+    REAL const ktrans,
+    REAL const ve,
+    std::size_t const point_index,
+    REAL const * const time,
+    REAL const * const cp)
+{
+    REAL convolution = 0.f;
+    for (std::size_t i = 1; i <= point_index; i++)
+    {
+        REAL const spacing = time[i] - time[i - 1];
+        REAL const ct = cp[i] * std::exp(-ktrans * (time[point_index] - time[i]) / ve);
+        REAL const ct_prev = cp[i - 1] * std::exp(-ktrans * (time[point_index] - time[i - 1]) / ve);
+        convolution += (ct + ct_prev) * spacing / 2.f;
+    }
+    return ktrans * convolution;
+}
+}
 
 LMFitCPP::LMFitCPP(
     REAL const tolerance,
@@ -822,6 +844,62 @@ void LMFitCPP::calc_derivatives_patlak(std::vector<REAL> & derivatives)
 
 }
 
+void LMFitCPP::calc_derivatives_tofts(std::vector<REAL> & derivatives)
+{
+    if (!user_info_)
+    {
+        throw std::runtime_error("TOFTS model requires user info containing time and Cp arrays.");
+    }
+
+    std::size_t const minimum_user_info_size = 2 * info_.n_points_ * sizeof(REAL);
+    if (info_.user_info_size_ < minimum_user_info_size)
+    {
+        throw std::runtime_error("TOFTS model requires user_info_size >= 2 * n_points * sizeof(REAL).");
+    }
+
+    REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
+    REAL const * const T = user_info_float;
+    REAL const * const Cp = user_info_float + info_.n_points_;
+
+    REAL const ktrans = parameters_[0];
+    REAL const ve = parameters_[1];
+
+    for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
+    {
+        REAL derivative_function = 0.f;
+        for (std::size_t i = 1; i <= point_index; i++)
+        {
+            REAL const spacing = T[i] - T[i - 1];
+            REAL const delta_t = T[point_index] - T[i];
+            REAL const delta_t_prev = T[point_index] - T[i - 1];
+            REAL const ct
+                = Cp[i]
+                * (1.f - ktrans / ve * delta_t)
+                * std::exp(-ktrans * delta_t / ve);
+            REAL const ct_prev
+                = Cp[i - 1]
+                * (1.f - ktrans / ve * delta_t_prev)
+                * std::exp(-ktrans * delta_t_prev / ve);
+            derivative_function += (ct + ct_prev) * spacing / 2.f;
+        }
+        derivatives[0 * info_.n_points_ + point_index] = derivative_function;
+
+        derivative_function = 0.f;
+        for (std::size_t i = 1; i <= point_index; i++)
+        {
+            REAL const spacing = T[i] - T[i - 1];
+            REAL const delta_t = T[point_index] - T[i];
+            REAL const delta_t_prev = T[point_index] - T[i - 1];
+            REAL const ct = Cp[i] * delta_t * std::exp(-ktrans * delta_t / ve);
+            REAL const ct_prev = Cp[i - 1] * delta_t_prev * std::exp(-ktrans * delta_t_prev / ve);
+            derivative_function += (ct + ct_prev) * spacing / 2.f;
+        }
+
+        derivatives[1 * info_.n_points_ + point_index]
+            = ktrans * ktrans / (ve * ve) * derivative_function;
+    }
+}
+
 void LMFitCPP::calc_values_cauchy2delliptic(std::vector<REAL>& cauchy)
 {
     int const size_x = int(std::sqrt(REAL(info_.n_points_)));
@@ -1329,6 +1407,29 @@ void LMFitCPP::calc_values_patlak(std::vector<REAL>& values)
     // }
 }
 
+void LMFitCPP::calc_values_tofts(std::vector<REAL>& values)
+{
+    if (!user_info_)
+    {
+        throw std::runtime_error("TOFTS model requires user info containing time and Cp arrays.");
+    }
+
+    std::size_t const minimum_user_info_size = 2 * info_.n_points_ * sizeof(REAL);
+    if (info_.user_info_size_ < minimum_user_info_size)
+    {
+        throw std::runtime_error("TOFTS model requires user_info_size >= 2 * n_points * sizeof(REAL).");
+    }
+
+    REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
+    REAL const * const T = user_info_float;
+    REAL const * const Cp = user_info_float + info_.n_points_;
+
+    for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
+    {
+        values[point_index] = tofts_get_value(parameters_[0], parameters_[1], point_index, T, Cp);
+    }
+}
+
 // depending on the model Id, calls functions to calculate model function values and derivatives
 void LMFitCPP::calc_curve_values(std::vector<REAL>& curve, std::vector<REAL>& derivatives)
 {           
@@ -1396,6 +1497,11 @@ void LMFitCPP::calc_curve_values(std::vector<REAL>& curve, std::vector<REAL>& de
     {
         calc_values_patlak(curve);
         calc_derivatives_patlak(derivatives);
+    }
+    else if (info_.model_id_ == TOFTS)
+    {
+        calc_values_tofts(curve);
+        calc_derivatives_tofts(derivatives);
     }
 }
 
