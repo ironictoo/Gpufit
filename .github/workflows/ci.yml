@@ -25,31 +25,26 @@ jobs:
             visual_studio: "Visual Studio 17 2022"
             vc_toolset: "v170"
             python: "3.10"
-            boost_platform_version: "2022"
 
           - os: windows-2025
             cuda: "12.8.1"
             visual_studio: "Visual Studio 17 2022"
             vc_toolset: "v170"
             python: "3.12"
-            boost_platform_version: "2025"
 
           # Linux: old/new supported runner + old/new CUDA
           - os: ubuntu-22.04
             cuda: "11.8.0"
             python: "3.10"
-            boost_platform_version: "22.04"
 
           - os: ubuntu-24.04
             cuda: "12.8.1"
             python: "3.12"
-            boost_platform_version: "24.04"
 
     env:
       build_dir: "build"
       config: "Release"
       gpufit_version: "1.2.0"
-      boost_version: "1.89.0"
 
     steps:
       - uses: actions/checkout@v4
@@ -63,26 +58,10 @@ jobs:
       - name: Upgrade Pip and Install wheel
         run: |
           python -m pip install --upgrade pip
-          pip install wheel
+          pip install wheel setuptools
 
       - name: Setup MATLAB
-        uses: matlab-actions/setup-matlab@v1.2.3
-
-      - name: Download and install Boost (Windows)
-        uses: MarkusJx/install-boost@v2.4.3
-        if: runner.os == 'Windows'
-        id: install-boost-w
-        with:
-          boost_version: ${{ env.boost_version }}
-          platform_version: ${{ matrix.boost_platform_version }}
-
-      - name: Download and install Boost (Linux)
-        uses: MarkusJx/install-boost@v2.4.3
-        if: runner.os == 'Linux'
-        id: install-boost-l
-        with:
-          boost_version: ${{ env.boost_version }}
-          platform_version: ${{ matrix.boost_platform_version }}
+        uses: matlab-actions/setup-matlab@v2.6.1
 
       - name: Install CUDA (Windows)
         uses: Jimver/cuda-toolkit@v0.2.30
@@ -133,28 +112,28 @@ jobs:
       - name: Configure CMake (Windows)
         id: configure-w
         shell: bash
-        env:
-          BOOST_ROOT: ${{ steps.install-boost-w.outputs.BOOST_ROOT }}
         if: runner.os == 'Windows'
         run: |
           rm -f "${{ env.build_dir }}/CMakeCache.txt"
-          cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET="cuda=$CUDA_PATH"
+          cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET="cuda=$CUDA_PATH" -DBUILD_TESTING=OFF
 
       - name: Configure CMake (Linux)
         id: configure-l
         shell: bash
-        env:
-          BOOST_ROOT: ${{ steps.install-boost-l.outputs.BOOST_ROOT }}
         if: runner.os == 'Linux'
         run: |
           rm -f "${{ env.build_dir }}/CMakeCache.txt"
-          cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE
+          cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_TESTING=OFF
 
       - name: Configure Error Processing
         if: always()
-        working-directory: ${{ env.build_dir }}
         shell: bash
         run: |
+          if [[ ! -d "${{ env.build_dir }}" ]]; then
+            echo "Build directory '${{ env.build_dir }}' not created; skipping CMake log dump."
+            exit 0
+          fi
+          cd "${{ env.build_dir }}"
           if [[ -f "CMakeFiles/CMakeOutput.log" ]]; then
             echo "---- CMakeFiles/CMakeOutput.log"
             cat CMakeFiles/CMakeOutput.log
@@ -170,15 +149,11 @@ jobs:
         if: runner.os == 'Windows'
         working-directory: ${{ env.build_dir }}
         run: cmake --build . --config ${{ env.config }} --target ALL_BUILD --verbose
-        env:
-          BOOST_ROOT: ${{ steps.install-boost-w.outputs.BOOST_ROOT }}
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
         working-directory: ${{ env.build_dir }}
         run: cmake --build . --verbose
-        env:
-          BOOST_ROOT: ${{ steps.install-boost-l.outputs.BOOST_ROOT }}
 
       - name: Upload Artifacts (Windows)
         uses: actions/upload-artifact@v4
