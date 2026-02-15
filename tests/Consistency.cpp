@@ -6,6 +6,7 @@
 
 #include <boost/test/included/unit_test.hpp>
 
+#include <string>
 #include <vector>
 
 void generate_input_linear_fit_1d(FitInput & i)
@@ -205,6 +206,12 @@ void perform_cpufit_gpufit_and_check(void (*func)(FitInput &))
 
 BOOST_AUTO_TEST_CASE( Consistency )
 {
+    if (!gpufit_cuda_available())
+    {
+        BOOST_TEST_MESSAGE(std::string("Skipping GPU consistency checks because CUDA is unavailable: ") + gpufit_get_last_error());
+        return;
+    }
+
 	BOOST_TEST_MESSAGE( "linear_fit_1d" );
 	perform_cpufit_gpufit_and_check(&generate_input_linear_fit_1d);
 

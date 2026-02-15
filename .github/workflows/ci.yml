@@ -21,7 +21,7 @@ jobs:
         include:
           # Windows: old/new supported runner + old/new CUDA
           - os: windows-2022
-            cuda: "11.8.0"
+            cuda: "12.4.1"
             visual_studio: "Visual Studio 17 2022"
             vc_toolset: "v170"
             python: "3.10"
