@@ -49,7 +49,7 @@ message( STATUS "CMAKE_CUDA_COMPILER_VERSION=${CMAKE_CUDA_COMPILER_VERSION}")
   endif()
   
   if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER "11.0" )
-    list( APPEND CMAKE_CUDA_ARCHITECTURES_D 86 )
+    list( APPEND CMAKE_CUDA_ARCHITECTURES_D 86 89 )
   endif()
 #  string( APPEND CMAKE_CUDA_ARCHITECTURES "+PTX" ) 
   set( CMAKE_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES_D}" CACHE STRING "List of architectures to compile, default is all")
@@ -141,7 +141,7 @@ endif()
 
 # Select Gpufit models, because the GPU resources can support only a certain few at once.
 # USE_GAUSSIAN_2D
-option(GPUFIT_USE_GAUSSIAN2D "Use the Gaussian 2D model, recommended for GPU vs CPU fitting comparison." ON)
+option(GPUFIT_USE_GAUSSIAN2D "Use the Gaussian 2D model, recommended for GPU vs CPU fitting comparison." )
 if( GPUFIT_USE_GAUSSIAN2D )
 	add_definitions( -DUSE_GAUSS2D )
 endif()
@@ -157,10 +157,10 @@ option( GPUFIT_USE_DIXON_2 "Use the Dixon 2 parameter model. (Extremely high res
 option( GPUFIT_USE_DIXON_3 "Use the Dixon 3 parameter model. (Extremely high resource usage)" )
 option( GPUFIT_USE_DIXON_4 "Use the Dixon 4 parameter model. (Extremely high resource usage)" )
 option( GPUFIT_USE_PATLAK "Use the Patlak model to fit." ON)
-option( GPUFIT_USE_TOFTS "Use the Tofts model to fit." ON)
-option( GPUFIT_USE_TOFTS_EXTENDED "Use the extended Tofts model to fit." ON)
+option( GPUFIT_USE_TOFTS "Use the Tofts model to fit." )
+option( GPUFIT_USE_TOFTS_EXTENDED "Use the extended Tofts model to fit." )
 option( GPUFIT_USE_TISSUE_UPTAKE "Use the tissue uptake model to fit." )
-option( GPUFIT_USE_2CXM "Use the two-compartment exchange model to fit." ON)
+option( GPUFIT_USE_2CXM "Use the two-compartment exchange model to fit." )
 option( GPUFIT_USE_T1_FA_EXPONENTIAL "Enable GPU accelerated T1 exponential mapping." ON)
 
 if( GPUFIT_USE_DIXON_2 )

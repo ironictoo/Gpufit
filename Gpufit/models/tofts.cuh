@@ -89,10 +89,6 @@ __device__ void calculate_tofts (               // function name
 		}
 		current_derivative[1 * n_points] = pow(parameters[0],2)/pow(parameters[1],2)*derivativeFunction;
 	}
-
-	// deallocate pointers
-	//delete T;
-	//delete Cp;
 }
 
 #endif

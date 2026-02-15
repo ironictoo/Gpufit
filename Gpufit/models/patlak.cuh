@@ -15,13 +15,11 @@ __device__ void calculate_patlak (               // function name
 {
 	// indices
 	REAL* user_info_float = (REAL*) user_info;
-
 	///////////////////////////// value //////////////////////////////
 
 	// split user_info array into time and Cp
 	REAL* T = user_info_float;
 	REAL* Cp = user_info_float + n_points;
-
 	// integral (trapezoidal rule)
 	REAL convCp = 0;
 	for (int i = 1; i < point_index; i++) {
@@ -34,12 +32,7 @@ __device__ void calculate_patlak (               // function name
 
 	/////////////////////////// derivative ///////////////////////////
 	REAL * current_derivative = derivative + point_index;
-
 	current_derivative[0 * n_points] = convCp;					// formula calculating derivative values with respect to parameters[0] (Ktrans)
 	current_derivative[1 * n_points] = Cp[point_index];			// formula calculating derivative values with respect to parameters[1] (vp)
-
-	// deallocate pointers
-	delete T;
-	delete Cp;
 }
 #endif

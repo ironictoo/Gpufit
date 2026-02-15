@@ -17,41 +17,41 @@ endfunction()
 
 # Examples
 
-if (DEFINED USE_BASE_MODELS)
+if ( GPUFIT_USE_BASE_MODELS )
 	add_example( Gpufit Simple_Example )
 	add_example( Gpufit Linear_Regression_Example )
 	add_example( Gpufit Exponential_Fitting )
 endif()
 
-if (DEFINED USE_DIXON_3)
+if ( GPUFIT_USE_DIXON_3 )
 	add_example( Gpufit Dixon_Fitting )
 endif()
 
-if (DEFINED USE_GAUSS2D)
+if ( GPUFIT_USE_GAUSSIAN2D )
 	add_example( Gpufit Gauss_Fit_2D_Example )
 endif()
 
-if (DEFINED USE_PATLAK)
+if ( GPUFIT_USE_PATLAK )
 	add_example( Gpufit Patlak_Fitting )
 endif()
 
-if (DEFINED USE_TOFTS)
+if ( GPUFIT_USE_TOFTS )
 	add_example( Gpufit Tofts_Fitting )
 endif()
 
-if (DEFINED USE_TOFTS_EXTENDED)
+if ( GPUFIT_USE_TOFTS_EXTENDED )
 	add_example( Gpufit Tofts_Extended_Fitting )
 endif()
 
-if (DEFINED USE_TISSUE_UPTAKE)
+if ( GPUFIT_USE_TISSUE_UPTAKE )
 	add_example( Gpufit Tissue_Uptake_Fitting )
 endif()
 
-if (DEFINED USE_2CXM)
+if ( GPUFIT_USE_2CXM )
 	add_example( Gpufit 2CXM_Fitting )
 endif()
 
-if (DEFINED USE_T1_EXPONENTIAL)
+if ( GPUFIT_USE_T1_FA_EXPONENTIAL )
 	add_example( Gpufit T1_FA_Exponential_Fitting )
 endif()
 
