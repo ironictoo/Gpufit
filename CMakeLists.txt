@@ -48,13 +48,21 @@ option( GPUFIT_ENABLE_CUDA "Build CUDA-enabled Gpufit components. Disable for CP
 set( GPUFIT_WITH_CUDA OFF )
 if( GPUFIT_ENABLE_CUDA )
   include( CheckLanguage )
+  # Unset any cached negative result so that a re-configure after installing
+  # CUDA will actually re-detect the compiler instead of reusing the old miss.
+  if( DEFINED CMAKE_CUDA_COMPILER AND NOT CMAKE_CUDA_COMPILER )
+    unset( CMAKE_CUDA_COMPILER CACHE )
+  endif()
   check_language( CUDA )
   if( CMAKE_CUDA_COMPILER )
     enable_language( CUDA )
     set( GPUFIT_WITH_CUDA ON )
     message( STATUS "CUDA compiler found: ${CMAKE_CUDA_COMPILER}" )
   else()
-    message( WARNING "CUDA toolkit (nvcc) was not found. Building CPU-only Cpufit. Most users typically want CUDA-enabled Gpufit; install CUDA and reconfigure, or set -DGPUFIT_ENABLE_CUDA=OFF to silence this warning." )
+    message( WARNING "CUDA toolkit (nvcc) was not found. Building CPU-only Cpufit. "
+      "Disabling GPUFIT_ENABLE_CUDA. Install CUDA and reconfigure to enable it." )
+    set( GPUFIT_ENABLE_CUDA OFF CACHE BOOL
+      "Build CUDA-enabled Gpufit components. Disable for CPU-only builds." FORCE )
   endif()
 else()
   message( STATUS "GPUFIT_ENABLE_CUDA=OFF. Building CPU-only Cpufit." )

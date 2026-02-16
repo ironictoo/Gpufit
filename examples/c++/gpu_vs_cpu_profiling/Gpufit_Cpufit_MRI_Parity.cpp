@@ -33,7 +33,7 @@ struct ComparisonResult
     int gpufit_status;
     std::size_t state_mismatches;
     std::size_t joint_converged;
-    REAL max_parameter_abs_diff;
+    REAL max_parameter_rel_diff;
     REAL max_chi_square_abs_diff;
 };
 
@@ -287,7 +287,7 @@ ComparisonResult run_comparison(
 
     std::size_t state_mismatches = 0;
     std::size_t joint_converged = 0;
-    REAL max_parameter_abs_diff = 0.f;
+    REAL max_parameter_rel_diff = 0.f;
     REAL max_chi_square_abs_diff = 0.f;
 
     for (std::size_t fit_index = 0; fit_index < model.n_fits; fit_index++)
@@ -307,15 +307,18 @@ ComparisonResult run_comparison(
             for (std::size_t parameter_index = 0; parameter_index < model.n_parameters; parameter_index++)
             {
                 std::size_t const flat_index = fit_index * model.n_parameters + parameter_index;
-                REAL const abs_diff = std::abs(cpu_parameters[flat_index] - gpu_parameters[flat_index]);
-                max_parameter_abs_diff = std::max(max_parameter_abs_diff, abs_diff);
+                REAL const denom = std::max(std::abs(cpu_parameters[flat_index]), std::abs(gpu_parameters[flat_index]));
+                REAL const rel_diff = denom > 0.f
+                    ? std::abs(cpu_parameters[flat_index] - gpu_parameters[flat_index]) / denom
+                    : std::abs(cpu_parameters[flat_index] - gpu_parameters[flat_index]);
+                max_parameter_rel_diff = std::max(max_parameter_rel_diff, rel_diff);
             }
         }
     }
 
     bool const status_ok = cpufit_status == ReturnState::OK && gpufit_status == ReturnState::OK;
     bool const convergence_ok = joint_converged > 0;
-    bool const parity_ok = state_mismatches == 0 && max_parameter_abs_diff < 2e-3f && max_chi_square_abs_diff < 2e-3f;
+    bool const parity_ok = state_mismatches == 0 && max_parameter_rel_diff < 2e-3f && max_chi_square_abs_diff < 2e-3f;
 
     return {
         status_ok && convergence_ok && parity_ok,
@@ -323,7 +326,7 @@ ComparisonResult run_comparison(
         gpufit_status,
         state_mismatches,
         joint_converged,
-        max_parameter_abs_diff,
+        max_parameter_rel_diff,
         max_chi_square_abs_diff
     };
 }
@@ -464,7 +467,7 @@ void print_result(ModelCase const & model, ComparisonResult const & result)
     std::cout << "  gpufit status:         " << result.gpufit_status << std::endl;
     std::cout << "  state mismatches:      " << result.state_mismatches << std::endl;
     std::cout << "  jointly converged:     " << result.joint_converged << " / " << model.n_fits << std::endl;
-    std::cout << "  max |param diff|:      " << result.max_parameter_abs_diff << std::endl;
+    std::cout << "  max |param rel diff|:  " << result.max_parameter_rel_diff << std::endl;
     std::cout << "  max |chi-square diff|: " << result.max_chi_square_abs_diff << std::endl;
     std::cout << "  parity result:         " << (result.ok ? "PASS" : "FAIL") << std::endl;
     std::cout << std::endl;

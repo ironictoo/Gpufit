@@ -910,9 +910,9 @@ void LMFitCPP::calc_derivatives_patlak(std::vector<REAL> & derivatives)
 	REAL* Cp = user_info_float + info_.n_points_;
 
 	// integral (trapezoidal rule)
-	REAL convCp = 0.f;
     for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
     {
+        REAL convCp = 0.f;
         for (int i = 1; i < point_index; i++)
         {
             REAL spacing = T[i] - T[i - 1];

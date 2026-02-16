@@ -14,45 +14,77 @@ endif()
 message( STATUS "CMAKE_CUDA_COMPILER_VERSION=${CMAKE_CUDA_COMPILER_VERSION}")
 
 
-# All does not include the latest PTX!
-  set( CMAKE_CUDA_ARCHITECTURES_D "" )
+# Build SASS for every supported real architecture and append PTX for the newest
+# one so that future GPUs can JIT-compile the code at load time.
+#
+# Each entry: minimum CUDA toolkit version -> list of compute capabilities.
+# Deprecated architectures removed by a toolkit are guarded by VERSION_LESS.
+set( _GPUFIT_CUDA_ARCHS "" )
 
-  if( CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "12.0" )
-    list( INSERT CMAKE_CUDA_ARCHITECTURES_D 0 35 50 52 )
-  endif()
-  if( CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "11.0" )
-    list( INSERT CMAKE_CUDA_ARCHITECTURES_D 0 30 32)
-  endif()
-  if( CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "9.0" )
-    list( INSERT CMAKE_CUDA_ARCHITECTURES_D 0 20 21 )
-  endif()
- 
- 
-  if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER "6.5" )
-      list( APPEND CMAKE_CUDA_ARCHITECTURES_D 53 )
-  endif()
-  
-  if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER "7.5" )
-    list( APPEND CMAKE_CUDA_ARCHITECTURES_D 60 61 )
-  endif()
-  
-  if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER "8.0" )
-    list( APPEND CMAKE_CUDA_ARCHITECTURES_D 70 72)
-  endif()
-  
-  if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER "9.2" )
-    list( APPEND CMAKE_CUDA_ARCHITECTURES_D 75 )
-  endif()
-  
-  if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER "10.2" )
-    list( APPEND CMAKE_CUDA_ARCHITECTURES_D 80 )
-  endif()
-  
-  if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER "11.0" )
-    list( APPEND CMAKE_CUDA_ARCHITECTURES_D 86 89 )
-  endif()
-#  string( APPEND CMAKE_CUDA_ARCHITECTURES "+PTX" ) 
-  set( CMAKE_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES_D}" CACHE STRING "List of architectures to compile, default is all")
+# Architectures deprecated / removed in newer toolkits ----------------------
+if( CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "9.0" )
+  list( APPEND _GPUFIT_CUDA_ARCHS 20 21 )
+endif()
+if( CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "11.0" )
+  list( APPEND _GPUFIT_CUDA_ARCHS 30 32 )
+endif()
+if( CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "12.0" )
+  list( APPEND _GPUFIT_CUDA_ARCHS 35 )
+endif()
+
+# Architectures added by newer toolkits -------------------------------------
+# Maxwell
+list( APPEND _GPUFIT_CUDA_ARCHS 50 52 53 )
+
+# Pascal  (CUDA >= 8.0)
+if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "8.0" )
+  list( APPEND _GPUFIT_CUDA_ARCHS 60 61 )
+endif()
+
+# Volta   (CUDA >= 9.0)
+if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "9.0" )
+  list( APPEND _GPUFIT_CUDA_ARCHS 70 72 )
+endif()
+
+# Turing  (CUDA >= 10.0)
+if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "10.0" )
+  list( APPEND _GPUFIT_CUDA_ARCHS 75 )
+endif()
+
+# Ampere  (CUDA >= 11.0)
+if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "11.0" )
+  list( APPEND _GPUFIT_CUDA_ARCHS 80 )
+endif()
+if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "11.1" )
+  list( APPEND _GPUFIT_CUDA_ARCHS 86 )
+endif()
+
+# Ada Lovelace (CUDA >= 11.8)
+if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "11.8" )
+  list( APPEND _GPUFIT_CUDA_ARCHS 89 )
+endif()
+
+# Hopper  (CUDA >= 11.8)
+if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "11.8" )
+  list( APPEND _GPUFIT_CUDA_ARCHS 90 )
+endif()
+
+# Blackwell (CUDA >= 12.8)
+if( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "12.8" )
+  list( APPEND _GPUFIT_CUDA_ARCHS 100 120 )
+endif()
+
+# Forward compatibility: append PTX for the highest arch so the driver can
+# JIT-compile for any future GPU that the toolkit doesn't know about yet.
+list( GET _GPUFIT_CUDA_ARCHS -1 _GPUFIT_HIGHEST_ARCH )
+list( APPEND _GPUFIT_CUDA_ARCHS "${_GPUFIT_HIGHEST_ARCH}-virtual" )
+
+# Always recompute the default; the user can still override on the command line
+# with -DCMAKE_CUDA_ARCHITECTURES="75;80" etc.
+set( CMAKE_CUDA_ARCHITECTURES "${_GPUFIT_CUDA_ARCHS}" CACHE STRING
+  "CUDA architectures to compile (SASS + PTX for highest). Default: all supported by this toolkit." FORCE )
+
+message( STATUS "CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}" )
 
 
 # Gpufit
@@ -157,10 +189,10 @@ option( GPUFIT_USE_DIXON_2 "Use the Dixon 2 parameter model. (Extremely high res
 option( GPUFIT_USE_DIXON_3 "Use the Dixon 3 parameter model. (Extremely high resource usage)" )
 option( GPUFIT_USE_DIXON_4 "Use the Dixon 4 parameter model. (Extremely high resource usage)" )
 option( GPUFIT_USE_PATLAK "Use the Patlak model to fit." ON)
-option( GPUFIT_USE_TOFTS "Use the Tofts model to fit." )
-option( GPUFIT_USE_TOFTS_EXTENDED "Use the extended Tofts model to fit." )
-option( GPUFIT_USE_TISSUE_UPTAKE "Use the tissue uptake model to fit." )
-option( GPUFIT_USE_2CXM "Use the two-compartment exchange model to fit." )
+option( GPUFIT_USE_TOFTS "Use the Tofts model to fit." ON)
+option( GPUFIT_USE_TOFTS_EXTENDED "Use the extended Tofts model to fit." ON)
+option( GPUFIT_USE_TISSUE_UPTAKE "Use the tissue uptake model to fit." ON)
+option( GPUFIT_USE_2CXM "Use the two-compartment exchange model to fit." ON)
 option( GPUFIT_USE_T1_FA_EXPONENTIAL "Enable GPU accelerated T1 exponential mapping." ON)
 
 if( GPUFIT_USE_DIXON_2 )
