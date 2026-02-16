@@ -33,15 +33,15 @@ Current automated release artifacts and runtime requirements:
 | `windows-x64-cuda12.4` | `Gpufit` + `Cpufit` | `windows-2022` | Windows x64; NVIDIA display driver `>= 551.61` (CUDA 12.4 GA minimum) |
 | `windows-x64-cuda12.8` | `Gpufit` + `Cpufit` | `windows-2025` | Windows x64; NVIDIA display driver `>= 570.65` (CUDA 12.8 GA minimum) |
 | `linux-x64-cuda11.8` | `Gpufit` + `Cpufit` | `ubuntu-22.04` | Linux x86_64; NVIDIA driver `>= 520.61.05` (CUDA 11.8 GA minimum); userspace compatibility with Ubuntu 22.04 build baseline |
-| `linux-x64-cuda12.4` | `Gpufit` + `Cpufit` | `ubuntu-24.04` | Linux x86_64; NVIDIA driver `>= 550.54.15` (CUDA 12.4.1 minimum); userspace compatibility with Ubuntu 24.04 build baseline |
-| `linux-x64-cuda12.8` | `Gpufit` + `Cpufit` | `ubuntu-24.04` | Linux x86_64; NVIDIA driver `>= 570.26` (CUDA 12.8 GA minimum); userspace compatibility with Ubuntu 24.04 build baseline |
+| `linux-x64-cuda12.5` | `Gpufit` + `Cpufit` | `ubuntu-24.04` | Linux x86_64; NVIDIA driver `>= 555.42.02` (CUDA 12.5 GA minimum); userspace compatibility with Ubuntu 24.04 build baseline |
+| `linux-x64-cuda13.0` | `Gpufit` + `Cpufit` | `ubuntu-24.04` | Linux x86_64; NVIDIA driver `>= 575.51.03` (CUDA 13.0 GA minimum); userspace compatibility with Ubuntu 24.04 build baseline |
 | `macos-x64-cpu` | `Cpufit` only | `macos-15-intel` | macOS x64; no NVIDIA/CUDA requirement |
 | `macos-arm64-cpu` | `Cpufit` only | `macos-14` | macOS arm64; no NVIDIA/CUDA requirement |
 
 Notes:
 
 - macOS artifacts are CPU-only and do not include the CUDA `Gpufit` shared library.
-- CUDA driver minimums above come from NVIDIA CUDA Toolkit release notes: [11.8](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-toolkit-release-notes/), [12.4](https://docs.nvidia.com/cuda/archive/12.4.0/cuda-toolkit-release-notes/index.html), [12.8](https://docs.nvidia.com/cuda/archive/12.8.0/cuda-toolkit-release-notes/index.html).
+- CUDA driver minimums above come from NVIDIA CUDA Toolkit release notes: [11.8](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-toolkit-release-notes/), [12.5](https://docs.nvidia.com/cuda/archive/12.5.1/cuda-toolkit-release-notes/index.html), [12.8](https://docs.nvidia.com/cuda/archive/12.8.0/cuda-toolkit-release-notes/index.html), [13.0](https://docs.nvidia.com/cuda/archive/13.0.2/cuda-toolkit-release-notes/index.html).
 - If your target machine is older/newer than the CI baseline OS, build from source for best compatibility.
 
 ## Documentation
@@ -73,15 +73,16 @@ Release model notes:
 
 - Linux/Windows CUDA artifacts include these models in Gpufit.
 - macOS artifacts are CPU-only (Cpufit only; no CUDA/Gpufit shared library).
+- The `Gpufit_Cpufit_MRI_Parity` executable is included in the `bin` folder of the release package to verify model implementation.
 
-| Model | Included in CUDA release binaries (Linux/Windows) | CPU version (Cpufit) | macOS release support | Associated tools |
-|---|---|---|---|---|
-| PATLAK | Yes | Yes | CPU-only (Cpufit) | `examples/c++/Patlak_Fitting.cpp`, `examples/python/patlak.py`, `Gpufit/tests/Patlak.cpp`, `examples/c++/gpu_vs_cpu_profiling/Gpufit_Cpufit_Patlak.cpp`, `examples/c++/gpu_vs_cpu_profiling/Patlak_Fitting_Comparison.cpp`, `examples/c++/gpu_vs_cpu_profiling/Gpufit_Cpufit_MRI_Parity.cpp` |
-| TOFTS | Yes | Yes | CPU-only (Cpufit) | `examples/c++/Tofts_Fitting.cpp`, `tests/ToftsCpu.cpp`, `examples/c++/gpu_vs_cpu_profiling/Gpufit_Cpufit_MRI_Parity.cpp` |
-| TOFTS_EXTENDED | Yes | Yes | CPU-only (Cpufit) | `examples/c++/Tofts_Extended_Fitting.cpp`, `examples/c++/gpu_vs_cpu_profiling/Gpufit_Cpufit_MRI_Parity.cpp` |
-| TISSUE_UPTAKE | Yes | Yes | CPU-only (Cpufit) | `examples/c++/Tissue_Uptake_Fitting.cpp`, `examples/c++/gpu_vs_cpu_profiling/Gpufit_Cpufit_MRI_Parity.cpp` |
-| TWO_COMPARTMENT_EXCHANGE (2CXM) | Yes | Yes | CPU-only (Cpufit) | `examples/c++/2CXM_Fitting.cpp`, `examples/c++/gpu_vs_cpu_profiling/Gpufit_Cpufit_MRI_Parity.cpp` |
-| T1_FA_EXPONENTIAL | Yes | Yes | CPU-only (Cpufit) | `examples/c++/T1_FA_Exponential_Fitting.cpp`, `examples/c++/gpu_vs_cpu_profiling/Gpufit_Cpufit_MRI_Parity.cpp` |
+| Model | Included in CUDA release binaries (Linux/Windows) | CPU version (Cpufit) | macOS release support |
+|---|---|---|---|
+| PATLAK | Yes | Yes | CPU-only (Cpufit) |
+| TOFTS | Yes | Yes | CPU-only (Cpufit) |
+| TOFTS_EXTENDED | Yes | Yes | CPU-only (Cpufit) |
+| TISSUE_UPTAKE | Yes | Yes | CPU-only (Cpufit) |
+| TWO_COMPARTMENT_EXCHANGE (2CXM) | Yes | Yes | CPU-only (Cpufit) |
+| T1_FA_EXPONENTIAL | Yes | Yes | CPU-only (Cpufit) |
 
 ## Examples
 

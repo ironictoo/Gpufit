@@ -135,13 +135,13 @@ jobs:
             python: "3.10"
 
           - os: ubuntu-24.04
-            asset_id: linux-x64-cuda12.4
+            asset_id: linux-x64-cuda12.5
             with_cuda: true
             cuda: "12.5.1"
             python: "3.12"
 
           - os: ubuntu-24.04
-            asset_id: linux-x64-cuda12.8
+            asset_id: linux-x64-cuda13.0
             with_cuda: true
             cuda: "13.0.2"
             python: "3.12"
@@ -391,6 +391,15 @@ jobs:
               exit 1
             fi
             cp "${gpufit_lib}" "${release_root}/lib/"
+
+            # Include MRI Parity executable for CUDA builds
+            mkdir -p "${release_root}/bin"
+            parity_exe="$(find "${build_dir}" -type f \( -name 'Gpufit_Cpufit_MRI_Parity' -o -name 'Gpufit_Cpufit_MRI_Parity.exe' \) | head -n 1 || true)"
+            if [[ -n "${parity_exe}" ]]; then
+              cp "${parity_exe}" "${release_root}/bin/"
+            else
+              echo "Warning: Gpufit_Cpufit_MRI_Parity executable not found."
+            fi
           fi
 
           if [[ "${RUNNER_OS}" == "Windows" ]]; then
