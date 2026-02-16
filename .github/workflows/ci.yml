@@ -214,6 +214,23 @@ jobs:
         working-directory: ${{ env.build_dir }}
         run: cmake --build . --verbose
 
+      - name: Verify pyCpufit import
+        shell: bash
+        run: |
+          set -euo pipefail
+          cpufit_pkg_root="$(find "${{ env.build_dir }}" -type d -name pyCpufit | head -n 1 || true)"
+          if [[ -z "${cpufit_pkg_root}" ]]; then
+            echo "pyCpufit package root not found under ${{ env.build_dir }}."
+            find "${{ env.build_dir }}" -maxdepth 5 -type d -print
+            exit 1
+          fi
+          export PYTHONPATH="${cpufit_pkg_root}${PYTHONPATH:+:${PYTHONPATH}}"
+          python - <<'PY'
+          import pycpufit.cpufit as cf
+          print("pycpufit:", cf.__file__)
+          print("fit_constrained:", hasattr(cf, "fit_constrained"))
+          PY
+
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         run: ctest --test-dir "${{ env.build_dir }}" -C "${{ env.config }}" --output-on-failure

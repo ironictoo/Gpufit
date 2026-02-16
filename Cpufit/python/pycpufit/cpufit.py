@@ -27,7 +27,13 @@ else:
 lib = cdll.LoadLibrary(lib_path)
 
 # cpufit_constrained function in the library
-cpufit_func = lib.cpufit_constrained
+try:
+    cpufit_func = lib.cpufit_constrained
+except AttributeError as exc:
+    raise RuntimeError(
+        "Cpufit library does not export 'cpufit_constrained'. "
+        "This usually indicates an outdated or mispackaged Cpufit binary."
+    ) from exc
 cpufit_func.restype = c_int
 cpufit_func.argtypes = [
     c_size_t,

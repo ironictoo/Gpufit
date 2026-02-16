@@ -10,6 +10,14 @@ on:
         description: "Git ref (branch, tag, or commit SHA) to build."
         required: false
         type: string
+      dev_tag_mode:
+        description: "Manual dev tag mode when release_tag is empty (latest reuses dev-latest, unique uses timestamp+sha)."
+        required: false
+        default: latest
+        type: choice
+        options:
+          - latest
+          - unique
       release_tag:
         description: "Optional release tag override (for manual dev builds)."
         required: false
@@ -39,6 +47,7 @@ jobs:
         id: meta
         env:
           INPUT_SOURCE_REF: ${{ github.event.inputs.source_ref }}
+          INPUT_DEV_TAG_MODE: ${{ github.event.inputs.dev_tag_mode }}
           INPUT_RELEASE_TAG: ${{ github.event.inputs.release_tag }}
           INPUT_RELEASE_NAME: ${{ github.event.inputs.release_name }}
         shell: bash
@@ -68,6 +77,7 @@ jobs:
             prerelease="true"
             release_notes="Automated nightly build from ${source_ref}."
           else
+            dev_tag_mode="${INPUT_DEV_TAG_MODE:-latest}"
             if [[ -n "${INPUT_SOURCE_REF:-}" ]]; then
               source_ref="${INPUT_SOURCE_REF}"
             else
@@ -76,12 +86,16 @@ jobs:
 
             if [[ -n "${INPUT_RELEASE_TAG:-}" ]]; then
               release_tag="${INPUT_RELEASE_TAG}"
+            elif [[ "${dev_tag_mode}" == "latest" ]]; then
+              release_tag="dev-latest"
             else
               release_tag="dev-${utc_stamp}-${short_sha}"
             fi
 
             if [[ -n "${INPUT_RELEASE_NAME:-}" ]]; then
               release_name="${INPUT_RELEASE_NAME}"
+            elif [[ "${release_tag}" == "dev-latest" ]]; then
+              release_name="Gpufit Dev Latest (${short_sha})"
             else
               release_name="Gpufit Dev ${utc_stamp} (${short_sha})"
             fi
@@ -171,6 +185,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install wheel setuptools
+
+      - name: Setup MATLAB
+        uses: matlab-actions/setup-matlab@v2.6.1
 
       - name: Setup Java 8 (for Gpufit Java package target)
         if: runner.os != 'Windows' && matrix.with_cuda
@@ -305,6 +322,23 @@ jobs:
         shell: bash
         run: cmake --build . --verbose
 
+      - name: Verify pyCpufit import
+        shell: bash
+        run: |
+          set -euo pipefail
+          cpufit_pkg_root="$(find "${{ env.build_dir }}" -type d -name pyCpufit | head -n 1 || true)"
+          if [[ -z "${cpufit_pkg_root}" ]]; then
+            echo "pyCpufit package root not found under ${{ env.build_dir }}."
+            find "${{ env.build_dir }}" -maxdepth 5 -type d -print
+            exit 1
+          fi
+          export PYTHONPATH="${cpufit_pkg_root}${PYTHONPATH:+:${PYTHONPATH}}"
+          python - <<'PY'
+          import pycpufit.cpufit as cf
+          print("pycpufit:", cf.__file__)
+          print("fit_constrained:", hasattr(cf, "fit_constrained"))
+          PY
+
       - name: Run tests (Windows)
         if: runner.os == 'Windows' && matrix.with_cuda
         shell: bash
@@ -325,7 +359,7 @@ jobs:
           archive_path="${package_root}/gpufit-${{ needs.prepare.outputs.release_tag }}-${{ matrix.asset_id }}.tar.gz"
 
           rm -rf "${package_root}"
-          mkdir -p "${release_root}/lib" "${release_root}/include/Cpufit" "${release_root}/python" "${release_root}/wheels"
+          mkdir -p "${release_root}/lib" "${release_root}/include/Cpufit" "${release_root}/python" "${release_root}/wheels" "${release_root}/matlab" "${release_root}/java"
 
           cp LICENSE.txt "${release_root}/"
           cp README.md "${release_root}/"
@@ -382,6 +416,36 @@ jobs:
 
           if [[ -z "$(find "${release_root}/wheels" -type f -print -quit)" ]]; then
             rmdir "${release_root}/wheels"
+          fi
+
+          matlab_entry="$(find "${build_dir}" -type f -name 'cpufit.m' -path '*/matlab/*' | head -n 1 || true)"
+          if [[ -n "${matlab_entry}" ]]; then
+            matlab_dir="$(dirname "${matlab_entry}")"
+            cp -R "${matlab_dir}/." "${release_root}/matlab/"
+          else
+            echo "MATLAB wrapper payload not found for ${RUNNER_OS}/${{ matrix.asset_id }}."
+          fi
+          if [[ -z "$(find "${release_root}/matlab" -mindepth 1 -print -quit)" ]]; then
+            rmdir "${release_root}/matlab"
+          fi
+
+          java_dir=""
+          java_jar="$(find "${build_dir}" -type f -path '*/java/Gpufit*.jar' | head -n 1 || true)"
+          if [[ -n "${java_jar}" ]]; then
+            java_dir="$(dirname "${java_jar}")"
+          else
+            java_readme="$(find "${build_dir}" -type f -path '*/java/README.txt' | head -n 1 || true)"
+            if [[ -n "${java_readme}" ]]; then
+              java_dir="$(dirname "${java_readme}")"
+            fi
+          fi
+          if [[ -n "${java_dir}" ]]; then
+            cp -R "${java_dir}/." "${release_root}/java/"
+          else
+            echo "Java wrapper payload not found for ${RUNNER_OS}/${{ matrix.asset_id }}."
+          fi
+          if [[ -z "$(find "${release_root}/java" -mindepth 1 -print -quit)" ]]; then
+            rmdir "${release_root}/java"
           fi
 
           cat > "${release_root}/BUILD_INFO.txt" <<EOF
