@@ -26,8 +26,6 @@ on:
         description: "Optional release title override."
         required: false
         type: string
-  schedule:
-    - cron: "30 8 * * *"
 
 permissions:
   contents: write
@@ -55,7 +53,6 @@ jobs:
           set -euo pipefail
 
           event_name="${GITHUB_EVENT_NAME}"
-          utc_day="$(date -u +%Y%m%d)"
           utc_stamp="$(date -u +%Y%m%d-%H%M)"
           short_sha="${GITHUB_SHA::8}"
 
@@ -71,11 +68,6 @@ jobs:
             release_name="Gpufit ${release_tag}"
             prerelease="false"
             release_notes="Automated point release for ${release_tag}."
-          elif [[ "${event_name}" == "schedule" ]]; then
-            release_tag="nightly-${utc_day}"
-            release_name="Gpufit Nightly ${utc_day}"
-            prerelease="true"
-            release_notes="Automated nightly build from ${source_ref}."
           else
             dev_tag_mode="${INPUT_DEV_TAG_MODE:-latest}"
             if [[ -n "${INPUT_SOURCE_REF:-}" ]]; then
