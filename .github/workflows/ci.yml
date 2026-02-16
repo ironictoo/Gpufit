@@ -98,7 +98,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $vcpkg = Join-Path $env:VCPKG_INSTALLATION_ROOT "vcpkg.exe"
-          & $vcpkg install boost:${{ env.vcpkg_triplet }}
+          & $vcpkg install boost-headers:${{ env.vcpkg_triplet }}
 
       - name: Install Boost (Linux)
         if: runner.os == 'Linux'
