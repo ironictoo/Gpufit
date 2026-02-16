@@ -137,13 +137,13 @@ jobs:
           - os: ubuntu-24.04
             asset_id: linux-x64-cuda12.4
             with_cuda: true
-            cuda: "12.4.1"
+            cuda: "12.5.1"
             python: "3.12"
 
           - os: ubuntu-24.04
             asset_id: linux-x64-cuda12.8
             with_cuda: true
-            cuda: "12.8.1"
+            cuda: "13.0.2"
             python: "3.12"
 
           - os: macos-15-intel
@@ -188,7 +188,7 @@ jobs:
         uses: matlab-actions/setup-matlab@v2.6.1
 
       - name: Setup Java 8 (for Gpufit Java package target)
-        if: runner.os != 'Windows' && matrix.with_cuda
+        if: matrix.with_cuda
         uses: actions/setup-java@v5
         with:
           distribution: "temurin"
@@ -293,9 +293,7 @@ jobs:
             -DGPUFIT_USE_TOFTS_EXTENDED=ON \
             -DGPUFIT_USE_TISSUE_UPTAKE=ON \
             -DGPUFIT_USE_2CXM=ON \
-            -DGPUFIT_USE_T1_FA_EXPONENTIAL=ON \
-            -DCMAKE_DISABLE_FIND_PACKAGE_Java=TRUE \
-            -DCMAKE_DISABLE_FIND_PACKAGE_JNI=TRUE
+            -DGPUFIT_USE_T1_FA_EXPONENTIAL=ON
 
       - name: Configure CMake (Linux CUDA)
         if: runner.os == 'Linux' && matrix.with_cuda
@@ -493,7 +491,7 @@ jobs:
           fetch-depth: 1
 
       - name: Download packaged artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           pattern: package-*
           merge-multiple: true

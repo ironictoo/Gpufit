@@ -8,6 +8,16 @@ Homepage for original project: [github.com/gpufit/Gpufit](https://github.com/gpu
 
 The manuscript describing Gpufit is now published in [Scientific Reports](https://www.nature.com/articles/s41598-017-15313-9).
 
+## Changelog
+
+### v1.4.0
+
+- **Complete Cpufit MRI model coverage** — all six MRI pharmacokinetic models (Patlak, Tofts, Extended Tofts, Tissue Uptake, 2CXM, T1 FA Exponential) are now available in both GPU (`Gpufit`) and CPU (`Cpufit`) libraries with full parity.
+- **Fixed Patlak CPU derivative bug** — the trapezoidal integral in `calc_derivatives_patlak` accumulated across data points instead of resetting per point, producing incorrect gradients and convergence failures.
+- **GPU/CPU MRI parity test** — new `Gpufit_Cpufit_MRI_Parity` example validates that all six MRI models produce matching results between GPU and CPU.
+- **Updated CUDA architecture support** — added Hopper (sm_90) and Blackwell (sm_100, sm_120) architectures; always emits PTX for the highest architecture to guarantee forward compatibility with future GPUs.
+- **Automated CI/CD releases** — GitHub Actions workflows for continuous integration and automated binary releases (tag-triggered and manual dev builds) across Windows (CUDA 12.4, 12.8), Linux (CUDA 11.8, 12.5, 13.0), and macOS (CPU-only x64 and arm64).
+
 ## Quick start instructions
 
 The release artifacts provide library and wrapper payloads. To run GPU-vs-CPU performance checks, build and run the profiling examples from source (for example `examples/c++/gpu_vs_cpu_profiling/Gpufit_Cpufit_Performance_Comparison.cpp`).

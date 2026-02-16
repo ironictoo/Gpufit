@@ -51,9 +51,9 @@ if ( USE_CUBLAS AND DEFINED CUBLAS_DLL )
 endif()
 
 if ( WIN32 )
-    set( gradle_command "gradlew.bat build \"-Dorg.gradle.java.home=${JAVA_HOME}\"" )
+    set( gradle_command cmd /c gradlew.bat build --no-daemon "-Dorg.gradle.java.home=${JAVA_HOME}" )
 else()
-    set( gradle_command "./gradlew" "build" )
+    set( gradle_command ./gradlew build --no-daemon )
 endif()
 
 add_custom_target( JAVA_PACKAGE ALL

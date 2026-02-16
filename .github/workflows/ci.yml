@@ -44,9 +44,15 @@ jobs:
             python: "3.10"
 
           - os: ubuntu-24.04
-            arch: x64
+            asset_id: linux-x64-cuda12.4
             with_cuda: true
-            cuda: "12.8.1"
+            cuda: "12.5.1"
+            python: "3.12"
+
+          - os: ubuntu-24.04
+            asset_id: linux-x64-cuda12.8
+            with_cuda: true
+            cuda: "13.0.2"
             python: "3.12"
 
           # macOS: Intel + Apple Silicon CPU-only validation
@@ -65,7 +71,7 @@ jobs:
     env:
       build_dir: "build"
       config: "Release"
-      gpufit_version: "1.2.0"
+      gpufit_version: "1.4.0"
       vcpkg_triplet: "x64-windows"
 
     steps:
@@ -86,7 +92,7 @@ jobs:
         uses: matlab-actions/setup-matlab@v2.6.1
 
       - name: Setup Java
-        if: runner.os != 'Windows' && matrix.with_cuda
+        if: matrix.with_cuda
         uses: actions/setup-java@v5
         with:
           distribution: "temurin"
@@ -166,7 +172,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           rm -f "${{ env.build_dir }}/CMakeCache.txt"
-          cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET="cuda=$CUDA_PATH" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ env.vcpkg_triplet }} -DBUILD_TESTING=ON -DCMAKE_DISABLE_FIND_PACKAGE_Java=TRUE -DCMAKE_DISABLE_FIND_PACKAGE_JNI=TRUE
+          cmake . -B "${{ env.build_dir }}" -G "${{ matrix.visual_studio }}" -A x64 -DCMAKE_GENERATOR_TOOLSET="cuda=$CUDA_PATH" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ env.vcpkg_triplet }} -DBUILD_TESTING=ON
 
       - name: Configure CMake (Linux)
         id: configure-l

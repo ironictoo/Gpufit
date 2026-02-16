@@ -9,7 +9,7 @@ set_property( GLOBAL PROPERTY USE_FOLDERS ON )
 cmake_policy(SET CMP0091 NEW)
 
 if( NOT PROJECT_NAME )
-  project( Gpufit VERSION 1.2.0 LANGUAGES CXX )
+  project( Gpufit VERSION 1.4.0 LANGUAGES CXX )
   include( CTest )
 endif()
 
