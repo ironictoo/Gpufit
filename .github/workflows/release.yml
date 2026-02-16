@@ -411,6 +411,11 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.source_ref }}
+          fetch-depth: 1
+
       - name: Download packaged artifacts
         uses: actions/download-artifact@v5
         with:
