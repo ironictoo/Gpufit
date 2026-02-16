@@ -14,6 +14,8 @@
 
 namespace
 {
+constexpr REAL PI = static_cast<REAL>(3.14159265359);
+
 REAL tofts_get_value(
     REAL const ktrans,
     REAL const ve,
@@ -30,6 +32,109 @@ REAL tofts_get_value(
         convolution += (ct + ct_prev) * spacing / 2.f;
     }
     return ktrans * convolution;
+}
+
+REAL tofts_extended_get_value(
+    REAL const ktrans,
+    REAL const ve,
+    REAL const vp,
+    std::size_t const point_index,
+    REAL const * const time,
+    REAL const * const cp)
+{
+    REAL convolution = 0.f;
+    for (std::size_t i = 1; i <= point_index; i++)
+    {
+        REAL const spacing = time[i] - time[i - 1];
+        REAL const ct = cp[i] * std::exp(-ktrans * (time[point_index] - time[i]) / ve);
+        REAL const ct_prev = cp[i - 1] * std::exp(-ktrans * (time[point_index] - time[i - 1]) / ve);
+        convolution += (ct + ct_prev) * spacing / 2.f;
+    }
+    return ktrans * convolution + vp * cp[point_index];
+}
+
+REAL tissue_uptake_get_value(
+    REAL const ktrans,
+    REAL const vp,
+    REAL const fp,
+    std::size_t const point_index,
+    REAL const * const time,
+    REAL const * const cp)
+{
+    REAL convolution = 0.f;
+    REAL const tp = vp / (fp / ((fp / ktrans) - 1.f) + fp);
+    for (std::size_t i = 1; i < point_index; i++)
+    {
+        REAL const spacing = time[i] - time[i - 1];
+        REAL const delta_t = time[point_index] - time[i];
+        REAL const delta_t_prev = time[point_index] - time[i - 1];
+        REAL const ct
+            = cp[i]
+            * (fp * std::exp(-delta_t / tp) + ktrans * (1.f - std::exp(-delta_t / tp)));
+        REAL const ct_prev
+            = cp[i - 1]
+            * (fp * std::exp(-delta_t_prev / tp) + ktrans * (1.f - std::exp(-delta_t_prev / tp)));
+        convolution += (ct + ct_prev) * spacing / 2.f;
+    }
+    return convolution;
+}
+
+REAL two_compartment_exchange_get_value(
+    REAL const ktrans,
+    REAL const ve,
+    REAL const vp,
+    REAL const fp,
+    std::size_t const point_index,
+    REAL const * const time,
+    REAL const * const cp)
+{
+    REAL ps = 0.f;
+    if (ktrans >= fp)
+    {
+        ps = 10e8;
+    }
+    else
+    {
+        ps = fp / ((fp / ktrans) - 1.f);
+    }
+
+    REAL convolution = 0.f;
+    REAL const tp = vp / (ps + fp);
+    REAL const te = ve / ps;
+    REAL const tb = vp / fp;
+    REAL const ksum = 1.f / tp + 1.f / te;
+    REAL const square_root_term = std::sqrt(std::pow(ksum, 2) - 4.f * (1.f / te) * (1.f / tb));
+    REAL const kpos = 0.5f * (ksum + square_root_term);
+    REAL const kneg = 0.5f * (ksum - square_root_term);
+    REAL const eneg = (kpos - 1.f / tb) / (kpos - kneg);
+
+    for (std::size_t i = 1; i < point_index; i++)
+    {
+        REAL const spacing = time[i] - time[i - 1];
+        REAL const delta_t = time[point_index] - time[i];
+        REAL const delta_t_prev = time[point_index] - time[i - 1];
+        REAL const ct
+            = cp[i]
+            * (std::exp(-delta_t * kpos) + eneg * (std::exp(-delta_t * kneg) - std::exp(-kpos)));
+        REAL const ct_prev
+            = cp[i - 1]
+            * (std::exp(-delta_t_prev * kpos) + eneg * (std::exp(-delta_t_prev * kneg) - std::exp(-kpos)));
+        convolution += (ct + ct_prev) * spacing / 2.f;
+    }
+    return fp * convolution;
+}
+
+REAL t1_fa_exponential_get_value(
+    REAL const a,
+    REAL const t1,
+    REAL const theta_degrees,
+    REAL const tr)
+{
+    REAL const theta = theta_degrees * PI / 180.f;
+    REAL const exponential_term = std::exp(-tr / t1);
+    REAL const numerator = (1.f - exponential_term) * std::sin(theta);
+    REAL const denominator = 1.f - exponential_term * std::cos(theta);
+    return a * numerator / denominator;
 }
 }
 
@@ -816,7 +921,7 @@ void LMFitCPP::calc_derivatives_patlak(std::vector<REAL> & derivatives)
 
         /////////////////////////// derivative ///////////////////////////
         derivatives[0 * info_.n_points_ + point_index] = convCp;					// formula calculating derivative values with respect to parameters[0] (Ktrans)
-        derivatives[1 * info_.n_points_] = Cp[point_index];			// formula calculating derivative values with respect to parameters[1] (vp)
+        derivatives[1 * info_.n_points_ + point_index] = Cp[point_index];			// formula calculating derivative values with respect to parameters[1] (vp)
     }
 
     //     REAL * user_info_float = (REAL*)user_info_;
@@ -897,6 +1002,165 @@ void LMFitCPP::calc_derivatives_tofts(std::vector<REAL> & derivatives)
 
         derivatives[1 * info_.n_points_ + point_index]
             = ktrans * ktrans / (ve * ve) * derivative_function;
+    }
+}
+
+void LMFitCPP::calc_derivatives_tofts_extended(std::vector<REAL> & derivatives)
+{
+    if (!user_info_)
+    {
+        throw std::runtime_error("TOFTS_EXTENDED model requires user info containing time and Cp arrays.");
+    }
+
+    std::size_t const minimum_user_info_size = 2 * info_.n_points_ * sizeof(REAL);
+    if (info_.user_info_size_ < minimum_user_info_size)
+    {
+        throw std::runtime_error("TOFTS_EXTENDED model requires user_info_size >= 2 * n_points * sizeof(REAL).");
+    }
+
+    REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
+    REAL const * const T = user_info_float;
+    REAL const * const Cp = user_info_float + info_.n_points_;
+    REAL const h = 10e-5f;
+
+    for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
+    {
+        REAL f_plus_h = tofts_extended_get_value(parameters_[0] + h, parameters_[1], parameters_[2], point_index, T, Cp);
+        REAL f_minus_h = tofts_extended_get_value(parameters_[0] - h, parameters_[1], parameters_[2], point_index, T, Cp);
+        derivatives[0 * info_.n_points_ + point_index] = (f_plus_h - f_minus_h) / (2.f * h);
+
+        f_plus_h = tofts_extended_get_value(parameters_[0], parameters_[1] + h, parameters_[2], point_index, T, Cp);
+        f_minus_h = tofts_extended_get_value(parameters_[0], parameters_[1] - h, parameters_[2], point_index, T, Cp);
+        derivatives[1 * info_.n_points_ + point_index] = (f_plus_h - f_minus_h) / (2.f * h);
+
+        f_plus_h = tofts_extended_get_value(parameters_[0], parameters_[1], parameters_[2] + h, point_index, T, Cp);
+        f_minus_h = tofts_extended_get_value(parameters_[0], parameters_[1], parameters_[2] - h, point_index, T, Cp);
+        derivatives[2 * info_.n_points_ + point_index] = (f_plus_h - f_minus_h) / (2.f * h);
+    }
+}
+
+void LMFitCPP::calc_derivatives_tissue_uptake(std::vector<REAL> & derivatives)
+{
+    if (!user_info_)
+    {
+        throw std::runtime_error("TISSUE_UPTAKE model requires user info containing time and Cp arrays.");
+    }
+
+    std::size_t const minimum_user_info_size = 2 * info_.n_points_ * sizeof(REAL);
+    if (info_.user_info_size_ < minimum_user_info_size)
+    {
+        throw std::runtime_error("TISSUE_UPTAKE model requires user_info_size >= 2 * n_points * sizeof(REAL).");
+    }
+
+    REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
+    REAL const * const T = user_info_float;
+    REAL const * const Cp = user_info_float + info_.n_points_;
+    REAL const h = 10e-5f;
+
+    for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
+    {
+        REAL f_plus_h = tissue_uptake_get_value(parameters_[0] + h, parameters_[1], parameters_[2], point_index, T, Cp);
+        REAL f_minus_h = tissue_uptake_get_value(parameters_[0] - h, parameters_[1], parameters_[2], point_index, T, Cp);
+        REAL f_plus_2h = tissue_uptake_get_value(parameters_[0] + 2.f * h, parameters_[1], parameters_[2], point_index, T, Cp);
+        REAL f_minus_2h = tissue_uptake_get_value(parameters_[0] - 2.f * h, parameters_[1], parameters_[2], point_index, T, Cp);
+        derivatives[0 * info_.n_points_ + point_index]
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+
+        f_plus_h = tissue_uptake_get_value(parameters_[0], parameters_[1] + h, parameters_[2], point_index, T, Cp);
+        f_minus_h = tissue_uptake_get_value(parameters_[0], parameters_[1] - h, parameters_[2], point_index, T, Cp);
+        f_plus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1] + 2.f * h, parameters_[2], point_index, T, Cp);
+        f_minus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1] - 2.f * h, parameters_[2], point_index, T, Cp);
+        derivatives[1 * info_.n_points_ + point_index]
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+
+        f_plus_h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] + h, point_index, T, Cp);
+        f_minus_h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] - h, point_index, T, Cp);
+        f_plus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] + 2.f * h, point_index, T, Cp);
+        f_minus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] - 2.f * h, point_index, T, Cp);
+        derivatives[2 * info_.n_points_ + point_index]
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+    }
+}
+
+void LMFitCPP::calc_derivatives_two_compartment_exchange(std::vector<REAL> & derivatives)
+{
+    if (!user_info_)
+    {
+        throw std::runtime_error("TWO_COMPARTMENT_EXCHANGE model requires user info containing time and Cp arrays.");
+    }
+
+    std::size_t const minimum_user_info_size = 2 * info_.n_points_ * sizeof(REAL);
+    if (info_.user_info_size_ < minimum_user_info_size)
+    {
+        throw std::runtime_error("TWO_COMPARTMENT_EXCHANGE model requires user_info_size >= 2 * n_points * sizeof(REAL).");
+    }
+
+    REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
+    REAL const * const T = user_info_float;
+    REAL const * const Cp = user_info_float + info_.n_points_;
+    REAL const h = 10e-5f;
+
+    for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
+    {
+        REAL f_plus_h = two_compartment_exchange_get_value(parameters_[0] + h, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
+        REAL f_minus_h = two_compartment_exchange_get_value(parameters_[0] - h, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
+        REAL f_plus_2h = two_compartment_exchange_get_value(parameters_[0] + 2.f * h, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
+        REAL f_minus_2h = two_compartment_exchange_get_value(parameters_[0] - 2.f * h, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
+        derivatives[0 * info_.n_points_ + point_index]
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+
+        f_plus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] + h, parameters_[2], parameters_[3], point_index, T, Cp);
+        f_minus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] - h, parameters_[2], parameters_[3], point_index, T, Cp);
+        f_plus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] + 2.f * h, parameters_[2], parameters_[3], point_index, T, Cp);
+        f_minus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] - 2.f * h, parameters_[2], parameters_[3], point_index, T, Cp);
+        derivatives[1 * info_.n_points_ + point_index]
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+
+        f_plus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] + h, parameters_[3], point_index, T, Cp);
+        f_minus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] - h, parameters_[3], point_index, T, Cp);
+        f_plus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] + 2.f * h, parameters_[3], point_index, T, Cp);
+        f_minus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] - 2.f * h, parameters_[3], point_index, T, Cp);
+        derivatives[2 * info_.n_points_ + point_index]
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+
+        f_plus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] + h, point_index, T, Cp);
+        f_minus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] - h, point_index, T, Cp);
+        f_plus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] + 2.f * h, point_index, T, Cp);
+        f_minus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] - 2.f * h, point_index, T, Cp);
+        derivatives[3 * info_.n_points_ + point_index]
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+    }
+}
+
+void LMFitCPP::calc_derivatives_t1_fa_exponential(std::vector<REAL> & derivatives)
+{
+    if (!user_info_)
+    {
+        throw std::runtime_error("T1_FA_EXPONENTIAL model requires user info containing theta and tr arrays.");
+    }
+
+    std::size_t const minimum_user_info_size = 2 * info_.n_points_ * sizeof(REAL);
+    if (info_.user_info_size_ < minimum_user_info_size)
+    {
+        throw std::runtime_error("T1_FA_EXPONENTIAL model requires user_info_size >= 2 * n_points * sizeof(REAL).");
+    }
+
+    REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
+    REAL const * const theta_degrees = user_info_float;
+    REAL const * const tr = user_info_float + info_.n_points_;
+
+    for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
+    {
+        REAL const theta = theta_degrees[point_index] * PI / 180.f;
+        REAL const exponential_negative = std::exp(-tr[point_index] / parameters_[1]);
+        REAL const exponential_positive = std::exp(tr[point_index] / parameters_[1]);
+        REAL const common_term
+            = ((1.f - exponential_negative) * std::sin(theta))
+            / (1.f - exponential_negative * std::cos(theta));
+        derivatives[0 * info_.n_points_ + point_index] = common_term;
+        derivatives[1 * info_.n_points_ + point_index]
+            = (parameters_[0] * tr[point_index] * std::sin(theta) * exponential_positive * (std::cos(theta) - 1.f))
+            / (std::pow(parameters_[1], 2) * std::pow(exponential_positive - std::cos(theta), 2));
     }
 }
 
@@ -1430,6 +1694,98 @@ void LMFitCPP::calc_values_tofts(std::vector<REAL>& values)
     }
 }
 
+void LMFitCPP::calc_values_tofts_extended(std::vector<REAL>& values)
+{
+    if (!user_info_)
+    {
+        throw std::runtime_error("TOFTS_EXTENDED model requires user info containing time and Cp arrays.");
+    }
+
+    std::size_t const minimum_user_info_size = 2 * info_.n_points_ * sizeof(REAL);
+    if (info_.user_info_size_ < minimum_user_info_size)
+    {
+        throw std::runtime_error("TOFTS_EXTENDED model requires user_info_size >= 2 * n_points * sizeof(REAL).");
+    }
+
+    REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
+    REAL const * const T = user_info_float;
+    REAL const * const Cp = user_info_float + info_.n_points_;
+
+    for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
+    {
+        values[point_index] = tofts_extended_get_value(parameters_[0], parameters_[1], parameters_[2], point_index, T, Cp);
+    }
+}
+
+void LMFitCPP::calc_values_tissue_uptake(std::vector<REAL>& values)
+{
+    if (!user_info_)
+    {
+        throw std::runtime_error("TISSUE_UPTAKE model requires user info containing time and Cp arrays.");
+    }
+
+    std::size_t const minimum_user_info_size = 2 * info_.n_points_ * sizeof(REAL);
+    if (info_.user_info_size_ < minimum_user_info_size)
+    {
+        throw std::runtime_error("TISSUE_UPTAKE model requires user_info_size >= 2 * n_points * sizeof(REAL).");
+    }
+
+    REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
+    REAL const * const T = user_info_float;
+    REAL const * const Cp = user_info_float + info_.n_points_;
+
+    for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
+    {
+        values[point_index] = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2], point_index, T, Cp);
+    }
+}
+
+void LMFitCPP::calc_values_two_compartment_exchange(std::vector<REAL>& values)
+{
+    if (!user_info_)
+    {
+        throw std::runtime_error("TWO_COMPARTMENT_EXCHANGE model requires user info containing time and Cp arrays.");
+    }
+
+    std::size_t const minimum_user_info_size = 2 * info_.n_points_ * sizeof(REAL);
+    if (info_.user_info_size_ < minimum_user_info_size)
+    {
+        throw std::runtime_error("TWO_COMPARTMENT_EXCHANGE model requires user_info_size >= 2 * n_points * sizeof(REAL).");
+    }
+
+    REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
+    REAL const * const T = user_info_float;
+    REAL const * const Cp = user_info_float + info_.n_points_;
+
+    for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
+    {
+        values[point_index] = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
+    }
+}
+
+void LMFitCPP::calc_values_t1_fa_exponential(std::vector<REAL>& values)
+{
+    if (!user_info_)
+    {
+        throw std::runtime_error("T1_FA_EXPONENTIAL model requires user info containing theta and tr arrays.");
+    }
+
+    std::size_t const minimum_user_info_size = 2 * info_.n_points_ * sizeof(REAL);
+    if (info_.user_info_size_ < minimum_user_info_size)
+    {
+        throw std::runtime_error("T1_FA_EXPONENTIAL model requires user_info_size >= 2 * n_points * sizeof(REAL).");
+    }
+
+    REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
+    REAL const * const theta_degrees = user_info_float;
+    REAL const * const tr = user_info_float + info_.n_points_;
+
+    for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
+    {
+        values[point_index] = t1_fa_exponential_get_value(parameters_[0], parameters_[1], theta_degrees[point_index], tr[point_index]);
+    }
+}
+
 // depending on the model Id, calls functions to calculate model function values and derivatives
 void LMFitCPP::calc_curve_values(std::vector<REAL>& curve, std::vector<REAL>& derivatives)
 {           
@@ -1502,6 +1858,26 @@ void LMFitCPP::calc_curve_values(std::vector<REAL>& curve, std::vector<REAL>& de
     {
         calc_values_tofts(curve);
         calc_derivatives_tofts(derivatives);
+    }
+    else if (info_.model_id_ == TOFTS_EXTENDED)
+    {
+        calc_values_tofts_extended(curve);
+        calc_derivatives_tofts_extended(derivatives);
+    }
+    else if (info_.model_id_ == TISSUE_UPTAKE)
+    {
+        calc_values_tissue_uptake(curve);
+        calc_derivatives_tissue_uptake(derivatives);
+    }
+    else if (info_.model_id_ == TWO_COMPARTMENT_EXCHANGE)
+    {
+        calc_values_two_compartment_exchange(curve);
+        calc_derivatives_two_compartment_exchange(derivatives);
+    }
+    else if (info_.model_id_ == T1_FA_EXPONENTIAL)
+    {
+        calc_values_t1_fa_exponential(curve);
+        calc_derivatives_t1_fa_exponential(derivatives);
     }
 }
 

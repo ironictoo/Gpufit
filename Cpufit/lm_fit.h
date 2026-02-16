@@ -121,6 +121,18 @@ private:
     void calc_values_tofts(std::vector<REAL>& values);
     void calc_derivatives_tofts(std::vector<REAL> & derivatives);
 
+    void calc_values_tofts_extended(std::vector<REAL>& values);
+    void calc_derivatives_tofts_extended(std::vector<REAL> & derivatives);
+
+    void calc_values_tissue_uptake(std::vector<REAL>& values);
+    void calc_derivatives_tissue_uptake(std::vector<REAL> & derivatives);
+
+    void calc_values_two_compartment_exchange(std::vector<REAL>& values);
+    void calc_derivatives_two_compartment_exchange(std::vector<REAL> & derivatives);
+
+    void calc_values_t1_fa_exponential(std::vector<REAL>& values);
+    void calc_derivatives_t1_fa_exponential(std::vector<REAL> & derivatives);
+
     void calculate_hessian(std::vector<REAL> const & derivatives,
         std::vector<REAL> const & curve);
 

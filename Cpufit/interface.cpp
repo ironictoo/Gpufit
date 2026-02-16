@@ -123,6 +123,18 @@ void FitInterface::set_number_of_parameters(ModelID const model_id)
     case TOFTS:
         n_parameters_ = 2;
         break;
+    case TOFTS_EXTENDED:
+        n_parameters_ = 3;
+        break;
+    case TISSUE_UPTAKE:
+        n_parameters_ = 3;
+        break;
+    case TWO_COMPARTMENT_EXCHANGE:
+        n_parameters_ = 4;
+        break;
+    case T1_FA_EXPONENTIAL:
+        n_parameters_ = 2;
+        break;
     default:
         throw std::runtime_error("unknown model ID");
     }

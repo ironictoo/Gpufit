@@ -135,6 +135,12 @@ jobs:
             python: "3.10"
 
           - os: ubuntu-24.04
+            asset_id: linux-x64-cuda12.4
+            with_cuda: true
+            cuda: "12.4.1"
+            python: "3.12"
+
+          - os: ubuntu-24.04
             asset_id: linux-x64-cuda12.8
             with_cuda: true
             cuda: "12.8.1"
@@ -282,6 +288,12 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET=${{ env.vcpkg_triplet }} \
             -DBUILD_TESTING=ON \
+            -DGPUFIT_USE_PATLAK=ON \
+            -DGPUFIT_USE_TOFTS=ON \
+            -DGPUFIT_USE_TOFTS_EXTENDED=ON \
+            -DGPUFIT_USE_TISSUE_UPTAKE=ON \
+            -DGPUFIT_USE_2CXM=ON \
+            -DGPUFIT_USE_T1_FA_EXPONENTIAL=ON \
             -DCMAKE_DISABLE_FIND_PACKAGE_Java=TRUE \
             -DCMAKE_DISABLE_FIND_PACKAGE_JNI=TRUE
 
@@ -290,7 +302,15 @@ jobs:
         shell: bash
         run: |
           rm -f "${{ env.build_dir }}/CMakeCache.txt"
-          cmake . -B "${{ env.build_dir }}" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake . -B "${{ env.build_dir }}" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=ON \
+            -DGPUFIT_USE_PATLAK=ON \
+            -DGPUFIT_USE_TOFTS=ON \
+            -DGPUFIT_USE_TOFTS_EXTENDED=ON \
+            -DGPUFIT_USE_TISSUE_UPTAKE=ON \
+            -DGPUFIT_USE_2CXM=ON \
+            -DGPUFIT_USE_T1_FA_EXPONENTIAL=ON
 
       - name: Configure CMake (macOS CPU only)
         if: runner.os == 'macOS' && !matrix.with_cuda
