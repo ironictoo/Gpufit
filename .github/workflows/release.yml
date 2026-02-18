@@ -576,7 +576,21 @@ jobs:
           shopt -s nullglob
           asset_files=(release-assets/*.tar.gz release-assets/SHA256SUMS.txt)
 
+          # Keep development tags (e.g. dev-latest) pointing to the current source commit.
+          if [[ "${RELEASE_TAG}" == dev-* ]]; then
+            release_commit="$(git rev-parse HEAD)"
+            git tag -f "${RELEASE_TAG}" "${release_commit}"
+            git push --force origin "refs/tags/${RELEASE_TAG}"
+          fi
+
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            # Remove existing uploaded assets so stale matrix files do not linger.
+            while IFS= read -r asset_id; do
+              if [[ -n "${asset_id}" ]]; then
+                gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
+              fi
+            done < <(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.assets[].id')
+
             gh release upload "${RELEASE_TAG}" "${asset_files[@]}" --clobber
             if [[ "${RELEASE_PRERELEASE}" == "true" ]]; then
               gh release edit "${RELEASE_TAG}" --title "${RELEASE_NAME}" --notes "${RELEASE_NOTES}" --prerelease
