@@ -6,6 +6,34 @@ if( NOT Matlab_FOUND )
   return()
 endif()
 
+set( MATLAB_MEX_LINK_LIBS )
+set( MATLAB_MEX_LINK_DIRS )
+if( UNIX AND NOT APPLE )
+  list( APPEND MATLAB_MEX_LINK_LIBS mex mx )
+  if( Matlab_BINARIES_DIR )
+    list( APPEND MATLAB_MEX_LINK_DIRS ${Matlab_BINARIES_DIR} )
+  endif()
+  if( Matlab_EXTERN_LIBRARY_DIR )
+    list( APPEND MATLAB_MEX_LINK_DIRS ${Matlab_EXTERN_LIBRARY_DIR} )
+  endif()
+elseif( TARGET Matlab::mex AND TARGET Matlab::mx )
+  list( APPEND MATLAB_MEX_LINK_LIBS Matlab::mex Matlab::mx )
+else()
+  list( APPEND MATLAB_MEX_LINK_LIBS ${Matlab_MEX_LIBRARY} ${Matlab_MX_LIBRARY} )
+endif()
+
+function( set_matlab_mex_portable_rpath target_name )
+  if( UNIX AND NOT APPLE )
+    set_target_properties( ${target_name}
+      PROPERTIES
+        BUILD_WITH_INSTALL_RPATH TRUE
+        BUILD_RPATH "\$ORIGIN"
+        INSTALL_RPATH "\$ORIGIN"
+        INSTALL_RPATH_USE_LINK_PATH FALSE
+    )
+  endif()
+endfunction()
+
 # set C++ ABI version on Linux to work with Matlab (see documentation)
 
 if( CMAKE_CXX_COMPILER_ID STREQUAL GNU )
@@ -41,8 +69,12 @@ set_target_properties( GpufitMex
 )
 
 target_include_directories( GpufitMex PRIVATE ${Matlab_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR} )
+if( MATLAB_MEX_LINK_DIRS )
+  target_link_directories( GpufitMex PRIVATE ${MATLAB_MEX_LINK_DIRS} )
+endif()
 
-target_link_libraries( GpufitMex Gpufit ${Matlab_LIBRARIES} )
+target_link_libraries( GpufitMex Gpufit ${MATLAB_MEX_LINK_LIBS} )
+set_matlab_mex_portable_rpath( GpufitMex )
 
 if( WIN32 )
   SET(CMAKE_SHARED_LINKER_FLAGS "/export:mexFunction")
@@ -72,8 +104,12 @@ set_target_properties( GpufitConstrainedMex
 )
 
 target_include_directories( GpufitConstrainedMex PRIVATE ${Matlab_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR} )
+if( MATLAB_MEX_LINK_DIRS )
+  target_link_directories( GpufitConstrainedMex PRIVATE ${MATLAB_MEX_LINK_DIRS} )
+endif()
 
-target_link_libraries( GpufitConstrainedMex Gpufit ${Matlab_LIBRARIES} )
+target_link_libraries( GpufitConstrainedMex Gpufit ${MATLAB_MEX_LINK_LIBS} )
+set_matlab_mex_portable_rpath( GpufitConstrainedMex )
 
 # MATLAB MEX FILE for cuda_available
 
@@ -97,16 +133,12 @@ set_target_properties( GpufitCudaAvailableMex
 )
 
 target_include_directories( GpufitCudaAvailableMex PRIVATE ${Matlab_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR} )
-
-target_link_libraries( GpufitCudaAvailableMex Gpufit ${Matlab_LIBRARIES} )
-
-if( UNIX AND NOT APPLE )
-  set_target_properties( GpufitCudaAvailableMex
-    PROPERTIES
-      BUILD_RPATH "\$ORIGIN"
-      INSTALL_RPATH "\$ORIGIN"
-  )
+if( MATLAB_MEX_LINK_DIRS )
+  target_link_directories( GpufitCudaAvailableMex PRIVATE ${MATLAB_MEX_LINK_DIRS} )
 endif()
+
+target_link_libraries( GpufitCudaAvailableMex Gpufit ${MATLAB_MEX_LINK_LIBS} )
+set_matlab_mex_portable_rpath( GpufitCudaAvailableMex )
 
 if( WIN32 )
   SET(CMAKE_SHARED_LINKER_FLAGS "/export:mexFunction")

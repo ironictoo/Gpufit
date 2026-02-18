@@ -6,6 +6,22 @@ if( NOT Matlab_FOUND )
   return()
 endif()
 
+set( MATLAB_MEX_LINK_LIBS )
+set( MATLAB_MEX_LINK_DIRS )
+if( UNIX AND NOT APPLE )
+  list( APPEND MATLAB_MEX_LINK_LIBS mex mx )
+  if( Matlab_BINARIES_DIR )
+    list( APPEND MATLAB_MEX_LINK_DIRS ${Matlab_BINARIES_DIR} )
+  endif()
+  if( Matlab_EXTERN_LIBRARY_DIR )
+    list( APPEND MATLAB_MEX_LINK_DIRS ${Matlab_EXTERN_LIBRARY_DIR} )
+  endif()
+elseif( TARGET Matlab::mex AND TARGET Matlab::mx )
+  list( APPEND MATLAB_MEX_LINK_LIBS Matlab::mex Matlab::mx )
+else()
+  list( APPEND MATLAB_MEX_LINK_LIBS ${Matlab_MEX_LIBRARY} ${Matlab_MX_LIBRARY} )
+endif()
+
 # Matlab MEX FILE
 
 set( Headers
@@ -28,7 +44,20 @@ set_target_properties( CpufitMex
 )
 
 target_include_directories( CpufitMex PRIVATE ${Matlab_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR})
-target_link_libraries( CpufitMex Cpufit ${Matlab_LIBRARIES} )
+if( MATLAB_MEX_LINK_DIRS )
+  target_link_directories( CpufitMex PRIVATE ${MATLAB_MEX_LINK_DIRS} )
+endif()
+target_link_libraries( CpufitMex Cpufit ${MATLAB_MEX_LINK_LIBS} )
+
+if( UNIX AND NOT APPLE )
+  set_target_properties( CpufitMex
+    PROPERTIES
+      BUILD_WITH_INSTALL_RPATH TRUE
+      BUILD_RPATH "\$ORIGIN"
+      INSTALL_RPATH "\$ORIGIN"
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+  )
+endif()
 
 if( WIN32 )
   SET(CMAKE_SHARED_LINKER_FLAGS "/export:mexFunction")
