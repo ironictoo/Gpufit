@@ -10,7 +10,7 @@ The manuscript describing Gpufit is now published in [Scientific Reports](https:
 
 ## Changelog
 
-### v1.4.0
+### v1.4.1
 
 - **Complete Cpufit MRI model coverage** — all six MRI pharmacokinetic models (Patlak, Tofts, Extended Tofts, Tissue Uptake, 2CXM, T1 FA Exponential) are now available in both GPU (`Gpufit`) and CPU (`Cpufit`) libraries with full parity.
 - **Fixed Patlak CPU derivative bug** — the trapezoidal integral in `calc_derivatives_patlak` accumulated across data points instead of resetting per point, producing incorrect gradients and convergence failures.

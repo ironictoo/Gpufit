@@ -71,7 +71,7 @@ jobs:
     env:
       build_dir: "build"
       config: "Release"
-      gpufit_version: "1.4.0"
+      gpufit_version: "1.4.1"
       vcpkg_triplet: "x64-windows"
 
     steps:

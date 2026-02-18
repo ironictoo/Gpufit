@@ -437,13 +437,43 @@ jobs:
             rmdir "${release_root}/wheels"
           fi
 
-          matlab_entry="$(find "${build_dir}" -type f -name 'cpufit.m' -path '*/matlab/*' | head -n 1 || true)"
-          if [[ -n "${matlab_entry}" ]]; then
-            matlab_dir="$(dirname "${matlab_entry}")"
+          matlab_dir=""
+          cpufit_matlab_entry="$(find "${build_dir}" -type f -path '*/matlab/cpufit.m' | head -n 1 || true)"
+          if [[ -n "${cpufit_matlab_entry}" ]]; then
+            matlab_dir="$(dirname "${cpufit_matlab_entry}")"
+          fi
+
+          gpufit_matlab_entry="$(find "${build_dir}" -type f -path '*/matlab/gpufit.m' | head -n 1 || true)"
+          if [[ -z "${matlab_dir}" && -n "${gpufit_matlab_entry}" ]]; then
+            matlab_dir="$(dirname "${gpufit_matlab_entry}")"
+          fi
+
+          if [[ -n "${matlab_dir}" ]]; then
             cp -R "${matlab_dir}/." "${release_root}/matlab/"
           else
-            echo "MATLAB wrapper payload not found for ${RUNNER_OS}/${{ matrix.asset_id }}."
+            echo "MATLAB wrapper payload not found in build outputs for ${RUNNER_OS}/${{ matrix.asset_id }}."
           fi
+
+          # Always include wrapper .m files from source to avoid silently missing scripts.
+          cp Cpufit/matlab/cpufit.m "${release_root}/matlab/"
+          if [[ "${{ matrix.with_cuda }}" == "true" ]]; then
+            cp Gpufit/matlab/ConstraintType.m "${release_root}/matlab/"
+            cp Gpufit/matlab/EstimatorID.m "${release_root}/matlab/"
+            cp Gpufit/matlab/ModelID.m "${release_root}/matlab/"
+            cp Gpufit/matlab/gpufit.m "${release_root}/matlab/"
+            cp Gpufit/matlab/gpufit_constrained.m "${release_root}/matlab/"
+            cp Gpufit/matlab/gpufit_cuda_available.m "${release_root}/matlab/"
+            cp Gpufit/matlab/gpufit_version.m "${release_root}/matlab/"
+            cp Gpufit/matlab/README.txt "${release_root}/matlab/"
+
+            for mex_target in GpufitMex GpufitConstrainedMex GpufitCudaAvailableMex; do
+              if [[ -z "$(find "${release_root}/matlab" -maxdepth 1 -type f -name "${mex_target}*" -print -quit)" ]]; then
+                echo "Expected MATLAB CUDA mex binary ${mex_target}* is missing from package payload."
+                exit 1
+              fi
+            done
+          fi
+
           if [[ -z "$(find "${release_root}/matlab" -mindepth 1 -print -quit)" ]]; then
             rmdir "${release_root}/matlab"
           fi
@@ -463,6 +493,22 @@ jobs:
           else
             echo "Java wrapper payload not found for ${RUNNER_OS}/${{ matrix.asset_id }}."
           fi
+
+          if [[ "${{ matrix.with_cuda }}" == "true" ]]; then
+            if [[ -z "$(find "${release_root}/java" -maxdepth 1 -type f -name 'Gpufit*.jar' -print -quit)" ]]; then
+              echo "Expected Java JAR is missing from CUDA package payload."
+              exit 1
+            fi
+            if [[ -z "$(find "${release_root}/java" -maxdepth 1 -type f \( -name 'GpufitJNI.dll' -o -name 'libGpufitJNI.so*' -o -name 'libGpufitJNI.dylib' \) -print -quit)" ]]; then
+              echo "Expected Java JNI library is missing from CUDA package payload."
+              exit 1
+            fi
+            if [[ -z "$(find "${release_root}/java" -maxdepth 1 -type f \( -name 'Gpufit.dll' -o -name 'libGpufit.so*' -o -name 'libGpufit.dylib' \) -print -quit)" ]]; then
+              echo "Expected Gpufit native library is missing from Java CUDA payload."
+              exit 1
+            fi
+          fi
+
           if [[ -z "$(find "${release_root}/java" -mindepth 1 -print -quit)" ]]; then
             rmdir "${release_root}/java"
           fi
