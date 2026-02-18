@@ -38,11 +38,28 @@ add_subdirectory( adapter )
 
 set( build_directory "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/java" )
 set( java_directory "${CMAKE_CURRENT_SOURCE_DIR}/gpufit" )
-file( GLOB java_jar "${java_directory}/build/libs/Gpufit*.jar" LIST_DIRECTORIES false )
+set( copy_java_jars_script "${CMAKE_CURRENT_BINARY_DIR}/copy_java_jars.cmake" )
+file( WRITE "${copy_java_jars_script}" [=[
+if( NOT DEFINED java_directory OR NOT DEFINED build_directory )
+  message( FATAL_ERROR "java_directory and build_directory must be set" )
+endif()
+
+file( GLOB java_jars
+  "${java_directory}/build/libs/Gpufit*.jar"
+  "${java_directory}/build/libs/gpufit*.jar"
+  LIST_DIRECTORIES false
+)
+
+if( NOT java_jars )
+  message( FATAL_ERROR "No Java JAR found in ${java_directory}/build/libs after Gradle build." )
+endif()
+
+file( COPY ${java_jars} DESTINATION "${build_directory}" )
+]=] )
+
 set( binary_files
   "$<TARGET_FILE:Gpufit>"
   "$<TARGET_FILE:GpufitJNI>"
-  "${java_jar}"
   "${CMAKE_CURRENT_SOURCE_DIR}/README.txt"
 )
 
@@ -63,6 +80,10 @@ add_custom_target( JAVA_PACKAGE ALL
     make_directory ${build_directory}
   COMMAND ${CMAKE_COMMAND} -E
     chdir ${java_directory} ${gradle_command}
+  COMMAND ${CMAKE_COMMAND}
+    -Djava_directory=${java_directory}
+    -Dbuild_directory=${build_directory}
+    -P ${copy_java_jars_script}
   COMMAND ${CMAKE_COMMAND} -E
     copy_if_different ${binary_files} ${build_directory}
   COMMAND ${CMAKE_COMMAND} -E

@@ -482,7 +482,7 @@ jobs:
           fi
 
           java_dir=""
-          java_jar="$(find "${build_dir}" -type f -path '*/java/Gpufit*.jar' | head -n 1 || true)"
+          java_jar="$(find "${build_dir}" -type f -path '*/java/*.jar' -iname '*gpufit*.jar' | head -n 1 || true)"
           if [[ -n "${java_jar}" ]]; then
             java_dir="$(dirname "${java_jar}")"
           else
@@ -498,7 +498,7 @@ jobs:
           fi
 
           if [[ "${{ matrix.with_cuda }}" == "true" ]]; then
-            if [[ -z "$(find "${release_root}/java" -maxdepth 1 -type f -name 'Gpufit*.jar' -print -quit)" ]]; then
+            if [[ -z "$(find "${release_root}/java" -maxdepth 1 -type f -iname '*gpufit*.jar' -print -quit)" ]]; then
               echo "Expected Java JAR is missing from CUDA package payload."
               exit 1
             fi
