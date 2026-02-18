@@ -100,6 +100,14 @@ target_include_directories( GpufitCudaAvailableMex PRIVATE ${Matlab_INCLUDE_DIRS
 
 target_link_libraries( GpufitCudaAvailableMex Gpufit ${Matlab_LIBRARIES} )
 
+if( UNIX AND NOT APPLE )
+  set_target_properties( GpufitCudaAvailableMex
+    PROPERTIES
+      BUILD_RPATH "\$ORIGIN"
+      INSTALL_RPATH "\$ORIGIN"
+  )
+endif()
+
 if( WIN32 )
   SET(CMAKE_SHARED_LINKER_FLAGS "/export:mexFunction")
 endif()
