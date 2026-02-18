@@ -105,6 +105,9 @@ endif()
 
 find_package( Matlab COMPONENTS MX_LIBRARY )
 if( Matlab_FOUND )
+  if( EXISTS "${CMAKE_BINARY_DIR}/Matlab" )
+    file( REMOVE_RECURSE "${CMAKE_BINARY_DIR}/Matlab" )
+  endif()
   find_program( Matlab_EXECUTABLE matlab
     PATHS "${Matlab_ROOT_DIR}/bin" PATH_SUFFIXES win32 win64 NO_DEFAULT_PATH )
   function( add_matlab_launcher target )
@@ -154,6 +157,10 @@ add_subdirectory( Cpufit )
 if( GPUFIT_WITH_CUDA )
   # Gpufit
   add_subdirectory( Gpufit )
+
+  if( TARGET MATLAB_CPUFIT_GPUFIT_PACKAGE AND TARGET MATLAB_GPUFIT_PACKAGE )
+    add_dependencies( MATLAB_CPUFIT_GPUFIT_PACKAGE MATLAB_GPUFIT_PACKAGE )
+  endif()
 
   # Examples using Gpufit and Cpufit
   add_subdirectory( examples/c++/gpu_vs_cpu_profiling )

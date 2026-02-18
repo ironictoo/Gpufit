@@ -148,6 +148,6 @@ add_custom_target( MATLAB_GPUFIT_PACKAGE
   COMMENT "Creating Gpufit Matlab package"
 )
 set_property( TARGET MATLAB_GPUFIT_PACKAGE PROPERTY FOLDER CMakePredefinedTargets )
-add_dependencies( MATLAB_GPUFIT_PACKAGE Gpufit GpufitMex GpufitCudaAvailableMex)
+add_dependencies( MATLAB_GPUFIT_PACKAGE Gpufit GpufitMex GpufitConstrainedMex GpufitCudaAvailableMex)
 
 # add launcher

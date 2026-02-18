@@ -438,14 +438,10 @@ jobs:
           fi
 
           matlab_dir=""
+          # Look for cpufit.m as that should always be present if the MATLAB wrapper was built (GPUfit not always built)
           cpufit_matlab_entry="$(find "${build_dir}" -type f -path '*/matlab/cpufit.m' | head -n 1 || true)"
           if [[ -n "${cpufit_matlab_entry}" ]]; then
             matlab_dir="$(dirname "${cpufit_matlab_entry}")"
-          fi
-
-          gpufit_matlab_entry="$(find "${build_dir}" -type f -path '*/matlab/gpufit.m' | head -n 1 || true)"
-          if [[ -z "${matlab_dir}" && -n "${gpufit_matlab_entry}" ]]; then
-            matlab_dir="$(dirname "${gpufit_matlab_entry}")"
           fi
 
           if [[ -n "${matlab_dir}" ]]; then
@@ -454,17 +450,24 @@ jobs:
             echo "MATLAB wrapper payload not found in build outputs for ${RUNNER_OS}/${{ matrix.asset_id }}."
           fi
 
-          # Always include wrapper .m files from source to avoid silently missing scripts.
-          cp Cpufit/matlab/cpufit.m "${release_root}/matlab/"
+          # Check for expected MATLAB wrapper files and fail if missing (to avoid silent packaging of empty MATLAB folder)
+          if [[ ! -f "${release_root}/matlab/cpufit.m" ]]; then
+            echo "Expected Cpufit MATLAB wrapper script cpufit.m is missing from package payload."
+            exit 1
+          fi
+
+          if [[ -z "$(find "${release_root}/matlab" -maxdepth 1 -type f -name 'CpufitMex*' -print -quit)" ]]; then
+            echo "Expected Cpufit MATLAB wrapper is missing from package payload."
+            exit 1
+          fi
+
           if [[ "${{ matrix.with_cuda }}" == "true" ]]; then
-            cp Gpufit/matlab/ConstraintType.m "${release_root}/matlab/"
-            cp Gpufit/matlab/EstimatorID.m "${release_root}/matlab/"
-            cp Gpufit/matlab/ModelID.m "${release_root}/matlab/"
-            cp Gpufit/matlab/gpufit.m "${release_root}/matlab/"
-            cp Gpufit/matlab/gpufit_constrained.m "${release_root}/matlab/"
-            cp Gpufit/matlab/gpufit_cuda_available.m "${release_root}/matlab/"
-            cp Gpufit/matlab/gpufit_version.m "${release_root}/matlab/"
-            cp Gpufit/matlab/README.txt "${release_root}/matlab/"
+            for wrapper_script in gpufit.m gpufit_constrained.m gpufit_cuda_available.m gpufit_version.m; do
+              if [[ ! -f "${release_root}/matlab/${wrapper_script}" ]]; then
+                echo "Expected MATLAB CUDA wrapper script ${wrapper_script} is missing from package payload."
+                exit 1
+              fi
+            done
 
             for mex_target in GpufitMex GpufitConstrainedMex GpufitCudaAvailableMex; do
               if [[ -z "$(find "${release_root}/matlab" -maxdepth 1 -type f -name "${mex_target}*" -print -quit)" ]]; then
