@@ -50,7 +50,7 @@ void LMFit::run(REAL const tolerance)
             info_,
             initial_parameters_ + fit_index*info_.n_parameters_,
             parameters_to_fit_,
-            constraints_,
+            constraints_ ? constraints_ + fit_index * info_.n_parameters_ * 2 : 0,
             constraint_types_,
             user_info_,
             output_parameters_ + fit_index*info_.n_parameters_,

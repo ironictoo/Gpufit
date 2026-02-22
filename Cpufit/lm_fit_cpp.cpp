@@ -16,6 +16,16 @@ namespace
 {
 constexpr REAL PI = static_cast<REAL>(3.14159265359);
 
+REAL positive_centered_difference_step(REAL const parameter)
+{
+    REAL h = std::max(static_cast<REAL>(1e-6f), static_cast<REAL>(1e-3f) * std::abs(parameter));
+    if (parameter > 0.f)
+    {
+        h = std::min(h, parameter * static_cast<REAL>(0.25f));
+    }
+    return std::max(h, static_cast<REAL>(1e-8f));
+}
+
 REAL tofts_get_value(
     REAL const ktrans,
     REAL const ve,
@@ -61,8 +71,35 @@ REAL tissue_uptake_get_value(
     REAL const * const time,
     REAL const * const cp)
 {
+    REAL const eps = static_cast<REAL>(1e-12f);
+    if (!std::isfinite(ktrans) || !std::isfinite(vp) || !std::isfinite(fp))
+    {
+        return 0.f;
+    }
+    if (ktrans <= eps || fp <= eps || vp < 0.f)
+    {
+        return 0.f;
+    }
+
     REAL convolution = 0.f;
-    REAL const tp = vp / (fp / ((fp / ktrans) - 1.f) + fp);
+    REAL ps = 0.f;
+    if (ktrans >= fp - eps)
+    {
+        ps = static_cast<REAL>(1e8f);
+    }
+    else
+    {
+        ps = fp / ((fp / ktrans) - 1.f);
+    }
+    if (!std::isfinite(ps) || ps < 0.f)
+    {
+        return 0.f;
+    }
+    REAL const tp = vp / (ps + fp);
+    if (!(tp > eps) || !std::isfinite(tp))
+    {
+        return 0.f;
+    }
     for (std::size_t i = 1; i < point_index; i++)
     {
         REAL const spacing = time[i] - time[i - 1];
@@ -74,6 +111,10 @@ REAL tissue_uptake_get_value(
         REAL const ct_prev
             = cp[i - 1]
             * (fp * std::exp(-delta_t_prev / tp) + ktrans * (1.f - std::exp(-delta_t_prev / tp)));
+        if (!std::isfinite(ct) || !std::isfinite(ct_prev))
+        {
+            return 0.f;
+        }
         convolution += (ct + ct_prev) * spacing / 2.f;
     }
     return convolution;
@@ -88,25 +129,61 @@ REAL two_compartment_exchange_get_value(
     REAL const * const time,
     REAL const * const cp)
 {
-    REAL ps = 0.f;
-    if (ktrans >= fp)
+    REAL const eps = static_cast<REAL>(1e-12f);
+    if (!std::isfinite(ktrans) || !std::isfinite(ve) || !std::isfinite(vp) || !std::isfinite(fp))
     {
-        ps = 10e8;
+        return 0.f;
+    }
+    if (ktrans <= eps || ve <= eps || vp <= eps || fp <= eps)
+    {
+        return 0.f;
+    }
+
+    REAL ps = 0.f;
+    if (ktrans >= fp - eps)
+    {
+        ps = static_cast<REAL>(1e8f);
     }
     else
     {
         ps = fp / ((fp / ktrans) - 1.f);
+    }
+    if (!std::isfinite(ps) || ps <= 0.f)
+    {
+        return 0.f;
     }
 
     REAL convolution = 0.f;
     REAL const tp = vp / (ps + fp);
     REAL const te = ve / ps;
     REAL const tb = vp / fp;
+    if (!(tp > eps) || !(te > eps) || !(tb > eps) || !std::isfinite(tp) || !std::isfinite(te) || !std::isfinite(tb))
+    {
+        return 0.f;
+    }
     REAL const ksum = 1.f / tp + 1.f / te;
-    REAL const square_root_term = std::sqrt(std::pow(ksum, 2) - 4.f * (1.f / te) * (1.f / tb));
+    REAL root_arg = std::pow(ksum, 2) - 4.f * (1.f / te) * (1.f / tb);
+    if (!std::isfinite(root_arg))
+    {
+        return 0.f;
+    }
+    if (root_arg < 0.f)
+    {
+        root_arg = 0.f;
+    }
+    REAL const square_root_term = std::sqrt(root_arg);
     REAL const kpos = 0.5f * (ksum + square_root_term);
     REAL const kneg = 0.5f * (ksum - square_root_term);
-    REAL const eneg = (kpos - 1.f / tb) / (kpos - kneg);
+    REAL denom = (kpos - kneg);
+    if (std::abs(denom) < eps || !std::isfinite(denom))
+    {
+        denom = (denom >= 0.f) ? eps : -eps;
+    }
+    REAL const eneg = (kpos - 1.f / tb) / denom;
+    if (!std::isfinite(kpos) || !std::isfinite(kneg) || !std::isfinite(eneg))
+    {
+        return 0.f;
+    }
 
     for (std::size_t i = 1; i < point_index; i++)
     {
@@ -115,10 +192,14 @@ REAL two_compartment_exchange_get_value(
         REAL const delta_t_prev = time[point_index] - time[i - 1];
         REAL const ct
             = cp[i]
-            * (std::exp(-delta_t * kpos) + eneg * (std::exp(-delta_t * kneg) - std::exp(-kpos)));
+            * (std::exp(-delta_t * kpos) + eneg * (std::exp(-delta_t * kneg) - std::exp(-delta_t * kpos)));
         REAL const ct_prev
             = cp[i - 1]
-            * (std::exp(-delta_t_prev * kpos) + eneg * (std::exp(-delta_t_prev * kneg) - std::exp(-kpos)));
+            * (std::exp(-delta_t_prev * kpos) + eneg * (std::exp(-delta_t_prev * kneg) - std::exp(-delta_t_prev * kpos)));
+        if (!std::isfinite(ct) || !std::isfinite(ct_prev))
+        {
+            return 0.f;
+        }
         convolution += (ct + ct_prev) * spacing / 2.f;
     }
     return fp * convolution;
@@ -1021,21 +1102,43 @@ void LMFitCPP::calc_derivatives_tofts_extended(std::vector<REAL> & derivatives)
     REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
     REAL const * const T = user_info_float;
     REAL const * const Cp = user_info_float + info_.n_points_;
-    REAL const h = 10e-5f;
+    REAL const ktrans = parameters_[0];
+    REAL const ve = parameters_[1];
 
     for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
     {
-        REAL f_plus_h = tofts_extended_get_value(parameters_[0] + h, parameters_[1], parameters_[2], point_index, T, Cp);
-        REAL f_minus_h = tofts_extended_get_value(parameters_[0] - h, parameters_[1], parameters_[2], point_index, T, Cp);
-        derivatives[0 * info_.n_points_ + point_index] = (f_plus_h - f_minus_h) / (2.f * h);
+        REAL derivative_function = 0.f;
+        for (std::size_t i = 1; i <= point_index; i++)
+        {
+            REAL const spacing = T[i] - T[i - 1];
+            REAL const delta_t = T[point_index] - T[i];
+            REAL const delta_t_prev = T[point_index] - T[i - 1];
+            REAL const ct
+                = Cp[i]
+                * (1.f - ktrans / ve * delta_t)
+                * std::exp(-ktrans * delta_t / ve);
+            REAL const ct_prev
+                = Cp[i - 1]
+                * (1.f - ktrans / ve * delta_t_prev)
+                * std::exp(-ktrans * delta_t_prev / ve);
+            derivative_function += (ct + ct_prev) * spacing / 2.f;
+        }
+        derivatives[0 * info_.n_points_ + point_index] = derivative_function;
 
-        f_plus_h = tofts_extended_get_value(parameters_[0], parameters_[1] + h, parameters_[2], point_index, T, Cp);
-        f_minus_h = tofts_extended_get_value(parameters_[0], parameters_[1] - h, parameters_[2], point_index, T, Cp);
-        derivatives[1 * info_.n_points_ + point_index] = (f_plus_h - f_minus_h) / (2.f * h);
+        derivative_function = 0.f;
+        for (std::size_t i = 1; i <= point_index; i++)
+        {
+            REAL const spacing = T[i] - T[i - 1];
+            REAL const delta_t = T[point_index] - T[i];
+            REAL const delta_t_prev = T[point_index] - T[i - 1];
+            REAL const ct = Cp[i] * delta_t * std::exp(-ktrans * delta_t / ve);
+            REAL const ct_prev = Cp[i - 1] * delta_t_prev * std::exp(-ktrans * delta_t_prev / ve);
+            derivative_function += (ct + ct_prev) * spacing / 2.f;
+        }
+        derivatives[1 * info_.n_points_ + point_index]
+            = ktrans * ktrans / (ve * ve) * derivative_function;
 
-        f_plus_h = tofts_extended_get_value(parameters_[0], parameters_[1], parameters_[2] + h, point_index, T, Cp);
-        f_minus_h = tofts_extended_get_value(parameters_[0], parameters_[1], parameters_[2] - h, point_index, T, Cp);
-        derivatives[2 * info_.n_points_ + point_index] = (f_plus_h - f_minus_h) / (2.f * h);
+        derivatives[2 * info_.n_points_ + point_index] = Cp[point_index];
     }
 }
 
@@ -1055,30 +1158,31 @@ void LMFitCPP::calc_derivatives_tissue_uptake(std::vector<REAL> & derivatives)
     REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
     REAL const * const T = user_info_float;
     REAL const * const Cp = user_info_float + info_.n_points_;
-    REAL const h = 10e-5f;
-
     for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
     {
-        REAL f_plus_h = tissue_uptake_get_value(parameters_[0] + h, parameters_[1], parameters_[2], point_index, T, Cp);
-        REAL f_minus_h = tissue_uptake_get_value(parameters_[0] - h, parameters_[1], parameters_[2], point_index, T, Cp);
-        REAL f_plus_2h = tissue_uptake_get_value(parameters_[0] + 2.f * h, parameters_[1], parameters_[2], point_index, T, Cp);
-        REAL f_minus_2h = tissue_uptake_get_value(parameters_[0] - 2.f * h, parameters_[1], parameters_[2], point_index, T, Cp);
+        REAL const h0 = positive_centered_difference_step(parameters_[0]);
+        REAL f_plus_h = tissue_uptake_get_value(parameters_[0] + h0, parameters_[1], parameters_[2], point_index, T, Cp);
+        REAL f_minus_h = tissue_uptake_get_value(parameters_[0] - h0, parameters_[1], parameters_[2], point_index, T, Cp);
+        REAL f_plus_2h = tissue_uptake_get_value(parameters_[0] + 2.f * h0, parameters_[1], parameters_[2], point_index, T, Cp);
+        REAL f_minus_2h = tissue_uptake_get_value(parameters_[0] - 2.f * h0, parameters_[1], parameters_[2], point_index, T, Cp);
         derivatives[0 * info_.n_points_ + point_index]
-            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h0);
 
-        f_plus_h = tissue_uptake_get_value(parameters_[0], parameters_[1] + h, parameters_[2], point_index, T, Cp);
-        f_minus_h = tissue_uptake_get_value(parameters_[0], parameters_[1] - h, parameters_[2], point_index, T, Cp);
-        f_plus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1] + 2.f * h, parameters_[2], point_index, T, Cp);
-        f_minus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1] - 2.f * h, parameters_[2], point_index, T, Cp);
+        REAL const h1 = positive_centered_difference_step(parameters_[1]);
+        f_plus_h = tissue_uptake_get_value(parameters_[0], parameters_[1] + h1, parameters_[2], point_index, T, Cp);
+        f_minus_h = tissue_uptake_get_value(parameters_[0], parameters_[1] - h1, parameters_[2], point_index, T, Cp);
+        f_plus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1] + 2.f * h1, parameters_[2], point_index, T, Cp);
+        f_minus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1] - 2.f * h1, parameters_[2], point_index, T, Cp);
         derivatives[1 * info_.n_points_ + point_index]
-            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h1);
 
-        f_plus_h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] + h, point_index, T, Cp);
-        f_minus_h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] - h, point_index, T, Cp);
-        f_plus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] + 2.f * h, point_index, T, Cp);
-        f_minus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] - 2.f * h, point_index, T, Cp);
+        REAL const h2 = positive_centered_difference_step(parameters_[2]);
+        f_plus_h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] + h2, point_index, T, Cp);
+        f_minus_h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] - h2, point_index, T, Cp);
+        f_plus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] + 2.f * h2, point_index, T, Cp);
+        f_minus_2h = tissue_uptake_get_value(parameters_[0], parameters_[1], parameters_[2] - 2.f * h2, point_index, T, Cp);
         derivatives[2 * info_.n_points_ + point_index]
-            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h2);
     }
 }
 
@@ -1098,37 +1202,39 @@ void LMFitCPP::calc_derivatives_two_compartment_exchange(std::vector<REAL> & der
     REAL const * const user_info_float = reinterpret_cast<REAL const *>(user_info_);
     REAL const * const T = user_info_float;
     REAL const * const Cp = user_info_float + info_.n_points_;
-    REAL const h = 10e-5f;
-
     for (std::size_t point_index = 0; point_index < info_.n_points_; point_index++)
     {
-        REAL f_plus_h = two_compartment_exchange_get_value(parameters_[0] + h, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
-        REAL f_minus_h = two_compartment_exchange_get_value(parameters_[0] - h, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
-        REAL f_plus_2h = two_compartment_exchange_get_value(parameters_[0] + 2.f * h, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
-        REAL f_minus_2h = two_compartment_exchange_get_value(parameters_[0] - 2.f * h, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
+        REAL const h0 = positive_centered_difference_step(parameters_[0]);
+        REAL f_plus_h = two_compartment_exchange_get_value(parameters_[0] + h0, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
+        REAL f_minus_h = two_compartment_exchange_get_value(parameters_[0] - h0, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
+        REAL f_plus_2h = two_compartment_exchange_get_value(parameters_[0] + 2.f * h0, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
+        REAL f_minus_2h = two_compartment_exchange_get_value(parameters_[0] - 2.f * h0, parameters_[1], parameters_[2], parameters_[3], point_index, T, Cp);
         derivatives[0 * info_.n_points_ + point_index]
-            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h0);
 
-        f_plus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] + h, parameters_[2], parameters_[3], point_index, T, Cp);
-        f_minus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] - h, parameters_[2], parameters_[3], point_index, T, Cp);
-        f_plus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] + 2.f * h, parameters_[2], parameters_[3], point_index, T, Cp);
-        f_minus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] - 2.f * h, parameters_[2], parameters_[3], point_index, T, Cp);
+        REAL const h1 = positive_centered_difference_step(parameters_[1]);
+        f_plus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] + h1, parameters_[2], parameters_[3], point_index, T, Cp);
+        f_minus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] - h1, parameters_[2], parameters_[3], point_index, T, Cp);
+        f_plus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] + 2.f * h1, parameters_[2], parameters_[3], point_index, T, Cp);
+        f_minus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1] - 2.f * h1, parameters_[2], parameters_[3], point_index, T, Cp);
         derivatives[1 * info_.n_points_ + point_index]
-            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h1);
 
-        f_plus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] + h, parameters_[3], point_index, T, Cp);
-        f_minus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] - h, parameters_[3], point_index, T, Cp);
-        f_plus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] + 2.f * h, parameters_[3], point_index, T, Cp);
-        f_minus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] - 2.f * h, parameters_[3], point_index, T, Cp);
+        REAL const h2 = positive_centered_difference_step(parameters_[2]);
+        f_plus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] + h2, parameters_[3], point_index, T, Cp);
+        f_minus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] - h2, parameters_[3], point_index, T, Cp);
+        f_plus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] + 2.f * h2, parameters_[3], point_index, T, Cp);
+        f_minus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2] - 2.f * h2, parameters_[3], point_index, T, Cp);
         derivatives[2 * info_.n_points_ + point_index]
-            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h2);
 
-        f_plus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] + h, point_index, T, Cp);
-        f_minus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] - h, point_index, T, Cp);
-        f_plus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] + 2.f * h, point_index, T, Cp);
-        f_minus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] - 2.f * h, point_index, T, Cp);
+        REAL const h3 = positive_centered_difference_step(parameters_[3]);
+        f_plus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] + h3, point_index, T, Cp);
+        f_minus_h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] - h3, point_index, T, Cp);
+        f_plus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] + 2.f * h3, point_index, T, Cp);
+        f_minus_2h = two_compartment_exchange_get_value(parameters_[0], parameters_[1], parameters_[2], parameters_[3] - 2.f * h3, point_index, T, Cp);
         derivatives[3 * info_.n_points_ + point_index]
-            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h);
+            = (f_minus_2h - 8.f * f_minus_h + 8.f * f_plus_h - f_plus_2h) / (12.f * h3);
     }
 }
 
@@ -2169,8 +2275,18 @@ void LMFitCPP::update_parameters()
 
 bool LMFitCPP::check_for_convergence()
 {
+    REAL effective_tolerance = tolerance_;
+    // Keep a small guardrail for TOFTS_EXTENDED when callers pass extremely
+    // tiny tolerances; production pipelines should still set a practical
+    // tolerance explicitly (for example 1e-6 for Cpufit float32 runs).
+    if (info_.model_id_ == TOFTS_EXTENDED)
+    {
+        REAL const tolerance_floor = static_cast<REAL>(1e-8f);
+        effective_tolerance = std::max(effective_tolerance, tolerance_floor);
+    }
     bool const fit_found
-        = std::abs(*chi_square_ - prev_chi_square_)  < std::max(tolerance_, tolerance_ * std::abs(*chi_square_));
+        = std::abs(*chi_square_ - prev_chi_square_)
+        < std::max(effective_tolerance, effective_tolerance * std::abs(*chi_square_));
 
     return fit_found;
 }
@@ -2234,6 +2350,25 @@ void LMFitCPP::modify_step_width()
 
 void LMFitCPP::run()
 {
+    auto model_buffers_finite = [this]() -> bool
+    {
+        for (std::size_t i = 0; i < curve_.size(); ++i)
+        {
+            if (!std::isfinite(curve_[i]))
+            {
+                return false;
+            }
+        }
+        for (std::size_t i = 0; i < derivatives_.size(); ++i)
+        {
+            if (!std::isfinite(derivatives_[i]))
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+
     for (int i = 0; i < info_.n_parameters_; i++)
         parameters_[i] = initial_parameters_[i];
 
@@ -2242,7 +2377,21 @@ void LMFitCPP::run()
 
     *state_ = FitState::CONVERGED;
 	calc_model();
+    if (!model_buffers_finite())
+    {
+        *state_ = FitState::SINGULAR_HESSIAN;
+        *chi_square_ = 0;
+        *n_iterations_ = 0;
+        return;
+    }
     calc_coefficients();
+    if (!std::isfinite(*chi_square_))
+    {
+        *state_ = FitState::SINGULAR_HESSIAN;
+        *chi_square_ = 0;
+        *n_iterations_ = 0;
+        return;
+    }
 
     if (info_.n_parameters_to_fit_ == 0)
         return;
@@ -2261,7 +2410,21 @@ void LMFitCPP::run()
             project_parameters_to_box();
 
         calc_model();
+        if (!model_buffers_finite())
+        {
+            *state_ = FitState::SINGULAR_HESSIAN;
+            *chi_square_ = prev_chi_square_;
+            *n_iterations_ = iteration + 1;
+            break;
+        }
         calc_coefficients();
+        if (!std::isfinite(*chi_square_))
+        {
+            *state_ = FitState::SINGULAR_HESSIAN;
+            *chi_square_ = prev_chi_square_;
+            *n_iterations_ = iteration + 1;
+            break;
+        }
 
         converged_ = check_for_convergence();
 

@@ -27,8 +27,8 @@ __device__ REAL get_2cx_value (
 	REAL Eneg = (Kpos - 1/Tb) / (Kpos - Kneg);
 	for (int i = 1; i < point_index; i++) {
 		REAL spacing = T[i] - T[i - 1];
-		REAL Ct =     Cp[i]     * (exp(-(T[point_index] - T[i])   * Kpos) + Eneg * (exp(-(T[point_index] - T[i])   * Kneg) - exp(-Kpos)));//(p2 * exp(-(T[point_index] - T[i])/Tp) + p0 * (1 - exp(-(T[point_index] - T[i])/Tp)));
-		REAL Ctprev = Cp[i - 1] * (exp(-(T[point_index] - T[i-1]) * Kpos) + Eneg * (exp(-(T[point_index] - T[i-1]) * Kneg) - exp(-Kpos))); //(p2 * exp(-(T[point_index] - T[i-1])/Tp) + p0 * (1 - exp(-(T[point_index] - T[i-1])/Tp)));
+		REAL Ct =     Cp[i]     * (exp(-(T[point_index] - T[i])   * Kpos) + Eneg * (exp(-(T[point_index] - T[i])   * Kneg) - exp(-(T[point_index] - T[i])   * Kpos)));//(p2 * exp(-(T[point_index] - T[i])/Tp) + p0 * (1 - exp(-(T[point_index] - T[i])/Tp)));
+		REAL Ctprev = Cp[i - 1] * (exp(-(T[point_index] - T[i-1]) * Kpos) + Eneg * (exp(-(T[point_index] - T[i-1]) * Kneg) - exp(-(T[point_index] - T[i-1]) * Kpos))); //(p2 * exp(-(T[point_index] - T[i-1])/Tp) + p0 * (1 - exp(-(T[point_index] - T[i-1])/Tp)));
 		convFunc += ((Ct + Ctprev) / 2 * spacing);
 	}
 	REAL function_value = p3 * convFunc;

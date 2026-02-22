@@ -105,6 +105,23 @@ class Status:
     Error = -1
 
 
+class FitState:
+    CONVERGED = 0
+    MAX_ITERATION = 1
+    SINGULAR_HESSIAN = 2
+    NEG_CURVATURE_MLE = 3
+    GPU_NOT_READY = 4
+
+
+_FIT_STATE_NAMES = {
+    FitState.CONVERGED: "CONVERGED",
+    FitState.MAX_ITERATION: "MAX_ITERATION",
+    FitState.SINGULAR_HESSIAN: "SINGULAR_HESSIAN",
+    FitState.NEG_CURVATURE_MLE: "NEG_CURVATURE_MLE",
+    FitState.GPU_NOT_READY: "GPU_NOT_READY",
+}
+
+
 def _valid_id(cls, id_value):
     properties = [key for key in cls.__dict__.keys() if not key.startswith('__')]
     values = [cls.__dict__[key] for key in properties]
@@ -115,6 +132,37 @@ def _decode_error(error_message):
     if isinstance(error_message, bytes):
         return error_message.decode('utf-8', errors='replace')
     return str(error_message)
+
+
+def fit_state_name(state):
+    """Return symbolic name for a Cpufit fit state."""
+    try:
+        state_int = int(state)
+    except Exception:
+        return 'UNKNOWN'
+    return _FIT_STATE_NAMES.get(state_int, 'UNKNOWN')
+
+
+def summarize_fit_states(states, number_iterations=None):
+    """Summarize fit-state counts and example indices for diagnostics."""
+    states_arr = np.asarray(states, dtype=np.int32).reshape(-1)
+    summary = {'total_fits': int(states_arr.size), 'counts': {}, 'failed_examples': []}
+    if number_iterations is not None:
+        iterations_arr = np.asarray(number_iterations, dtype=np.int32).reshape(-1)
+    else:
+        iterations_arr = None
+
+    unique, counts = np.unique(states_arr, return_counts=True)
+    for state_value, count in zip(unique.tolist(), counts.tolist()):
+        summary['counts'][fit_state_name(state_value)] = int(count)
+
+    failed_idx = np.nonzero(states_arr != FitState.CONVERGED)[0]
+    for idx in failed_idx[:8]:
+        item = {'index': int(idx), 'state': int(states_arr[idx]), 'state_name': fit_state_name(states_arr[idx])}
+        if iterations_arr is not None and idx < iterations_arr.size:
+            item['iterations'] = int(iterations_arr[idx])
+        summary['failed_examples'].append(item)
+    return summary
 
 
 def fit(
